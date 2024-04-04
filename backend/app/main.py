@@ -1,3 +1,5 @@
+import logging.config
+
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from starlette.middleware.cors import CORSMiddleware
@@ -5,9 +7,17 @@ from starlette.middleware.cors import CORSMiddleware
 from app.api.main import api_router
 from app.core.config import settings
 
+# Configure logging
+logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
+
 
 def custom_generate_unique_id(route: APIRoute) -> str:
-    return f"{route.tags[0]}-{route.name}"
+    # Check if the route has tags and use the first tag as part of the unique ID
+    if route.tags:
+        return f"{route.tags[0]}-{route.name}"
+    else:
+        # If no tags are present, use a default tag or another attribute for the unique ID
+        return f"default-{route.name}"
 
 
 app = FastAPI(
@@ -27,5 +37,12 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+@app.get("/")
+async def root():
+    logging.getLogger("sampleLogger").debug("Test log message from the root route")
+    return {"message": "Hello World"}
+
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

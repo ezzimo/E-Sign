@@ -87,7 +87,8 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[misc]
     @property
     def emails_enabled(self) -> bool:
-        return bool(self.SMTP_HOST and self.EMAILS_FROM_EMAIL)
+        # return bool(self.SMTP_HOST and self.EMAILS_FROM_EMAIL)
+        return False
 
     # TODO: update type to EmailStr when sqlmodel supports it
     EMAIL_TEST_USER: str = "test@example.com"
@@ -95,6 +96,9 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: str
     FIRST_SUPERUSER_PASSWORD: str
     USERS_OPEN_REGISTRATION: bool = False
+    FIRST_NAME: str
+    LAST_NAME: str
+    ROLE: str
 
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":

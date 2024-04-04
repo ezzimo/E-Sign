@@ -1,16 +1,17 @@
-"""Initialize models
+"""initialize database
 
-Revision ID: e2412789c190
+Revision ID: 6c2c3c03affa
 Revises:
-Create Date: 2023-11-24 22:55:43.195942
+Create Date: 2024-04-03 12:05:18.173074
 
 """
+
 import sqlalchemy as sa
 import sqlmodel.sql.sqltypes
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "e2412789c190"
+revision = "6c2c3c03affa"
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -28,6 +29,12 @@ def upgrade():
         sa.Column(
             "hashed_password", sqlmodel.sql.sqltypes.AutoString(), nullable=False
         ),
+        sa.Column("first_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("last_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("company", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("role", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_user_email"), "user", ["email"], unique=True)

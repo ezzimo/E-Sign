@@ -10,7 +10,7 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+fileConfig("logging.conf", disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -18,7 +18,9 @@ fileConfig(config.config_file_name)
 # target_metadata = mymodel.Base.metadata
 # target_metadata = None
 
-from app.models import SQLModel  # noqa
+from app.models.models import Item  # noqa
+from app.models.models import SQLModel  # noqa
+from app.models.user_model import User  # noqa
 
 target_metadata = SQLModel.metadata
 
