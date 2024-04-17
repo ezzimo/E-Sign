@@ -97,7 +97,7 @@ def generate_new_account_email(
 
 def generate_password_reset_token(email: str) -> str:
     delta = timedelta(hours=settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS)
-    now = datetime.utcnow()
+    now = datetime.now
     expires = now + delta
     exp = expires.timestamp()
     encoded_jwt = jwt.encode(
@@ -114,3 +114,12 @@ def verify_password_reset_token(token: str) -> str | None:
         return str(decoded_token["sub"])
     except JWTError:
         return None
+
+
+def send_signature_request_email(
+    email_to: str, link: str, document_title: str, message: str
+):
+    subject = "Signature Request for {document_title}"
+    html_content = f"""<p>You have a new signature request.</p>
+                        <p>Message: {message}</p><a href='{link}'>Sign Document</a>"""
+    send_email(email_to=email_to, subject=subject, html_content=html_content)

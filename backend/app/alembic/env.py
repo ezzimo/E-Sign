@@ -21,6 +21,12 @@ fileConfig("logging.conf", disable_existing_loggers=False)
 from app.models.models import Item  # noqa
 from app.models.models import SQLModel  # noqa
 from app.models.user_model import User  # noqa
+from app.models.document_model import Document  # noqa
+from app.models import ( # noqa
+    document_model, user_model, models, # noqa
+    audit_log_model, signatory_model, # noqa
+    signature_request_model, # noqa
+)
 
 target_metadata = SQLModel.metadata
 
