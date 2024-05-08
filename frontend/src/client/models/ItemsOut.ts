@@ -3,9 +3,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import type { ItemOut } from './ItemOut';
+import type { ItemOut } from "./ItemOut";
 
 export type ItemsOut = {
-    data: Array<ItemOut>;
-    count: number;
+	data: Array<ItemOut>;
+	count: number;
 };

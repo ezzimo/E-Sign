@@ -4,8 +4,8 @@
 /* eslint-disable */
 
 export type ItemOut = {
-    title: string;
-    description?: (string | null);
-    id: number;
-    owner_id: number;
+	title: string;
+	description?: string | null;
+	id: number;
+	owner_id: number;
 };

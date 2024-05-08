@@ -4,6 +4,6 @@
 /* eslint-disable */
 
 export type ItemCreate = {
-    title: string;
-    description?: (string | null);
+	title: string;
+	description?: string | null;
 };
