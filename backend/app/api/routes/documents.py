@@ -7,36 +7,18 @@ from app.api.deps import get_current_user, get_db
 from app.crud import document_crud
 from app.models.document_model import Document
 from app.models.user_model import User
-from app.schemas.document_schema import DocumentCreate, DocumentsOut, DocumentUpdate
+from app.schemas.document_schema import DocumentCreate, DocumentOut, DocumentUpdate
+from app.schemas.field_schema import FieldOut
+from app.schemas.signature_request_schema import SignatureRequestRead
 
 router = APIRouter()
 
 
-# @router.post("/", response_model=DocumentsOut)
-# def create_document(
-#     *,
-#     db: Session = Depends(get_db),
-#     document_in: DocumentCreate,
-#     current_user: int = Depends(
-#         get_current_user
-#     )  # Adjust according to your auth system
-# ):
-#     """
-#     Create new document.
-#     """
-#     document = document_crud.create_document(
-#         db=db, obj_in=document_in, owner_id=current_user.id
-#     )
-#     return document
-
-
-@router.post("/", response_model=DocumentsOut)
+@router.post("/", response_model=DocumentOut)
 async def create_document(
     db: Session = Depends(get_db),
     title: str = Form(...),
-    status: str = Form(
-        ...
-    ),  # Adjust this if you have a more complex handling for status
+    status: str = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -71,7 +53,7 @@ async def create_document(
     return document
 
 
-@router.get("/{document_id}", response_model=DocumentsOut)
+@router.get("/{document_id}", response_model=DocumentOut)
 def read_document(*, db: Session = Depends(get_db), document_id: int):
     """
     Get document by ID.
@@ -82,35 +64,38 @@ def read_document(*, db: Session = Depends(get_db), document_id: int):
     return document
 
 
-@router.get("/", response_model=DocumentsOut)
+@router.get("/", response_model=list[DocumentOut])
 def read_documents(
-    session: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
-) -> Any:
+) -> list[DocumentOut]:
     """
-    Retrieve documents. If the user is a superuser, retrieve all documents,
-    otherwise retrieve only documents owned by the user.
+    Retrieve documents with manual mapping.
     """
-    if current_user.is_superuser:
-        documents = session.exec(select(Document).offset(skip).limit(limit)).all()
-        count = session.exec(select(Document).count()).one()
-    else:
-        documents = session.exec(
-            select(Document)
-            .where(Document.owner_id == current_user.id)
-            .offset(skip)
-            .limit(limit)
-        ).all()
-        count = session.exec(
-            select(Document).where(Document.owner_id == current_user.id).count()
-        ).one()
+    documents = db.exec(select(Document).offset(skip).limit(limit)).all()
 
-    return DocumentsOut(data=documents, count=count)
+    return [
+        DocumentOut(
+            id=doc.id,
+            title=doc.title,
+            file=doc.file,
+            status=doc.status.value,
+            created_at=doc.created_at,
+            updated_at=doc.updated_at,
+            owner=doc.owner,
+            doc_requests=[
+                SignatureRequestRead(**req.__dict__) for req in doc.doc_requests
+            ],
+            signature_fields=[
+                FieldOut(**field.__dict__) for field in doc.signature_fields
+            ],
+        )
+        for doc in documents
+    ]
 
 
-@router.put("/{document_id}", response_model=DocumentsOut)
+@router.put("/{document_id}", response_model=DocumentOut)
 def update_document(
     document_id: int,
     document_in: DocumentUpdate,

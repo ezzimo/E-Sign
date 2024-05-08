@@ -1,7 +1,11 @@
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING, Optional
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
+
+if TYPE_CHECKING:
+    from .signature_request_model import SignatureRequest
 
 
 class AuditLogAction(str, Enum):
@@ -11,9 +15,17 @@ class AuditLogAction(str, Enum):
     DOCUMENT_VIEWED = "document viewed"
 
 
-class AuditLog(SQLModel, table=True):
+class AuditLogBase(SQLModel):
     id: int | None = Field(default=None, primary_key=True)
-    document_id: int | None = Field(default=None, foreign_key="document.id")
-    user_id: int | None = Field(default=None, foreign_key="user.id")
+    description: str | None
+    ip_address: str | None
     action: AuditLogAction
     timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class AuditLog(AuditLogBase, table=True):
+    signature_request_id: int = Field(default=None, foreign_key="signaturerequest.id")
+
+    signature_request: Optional["SignatureRequest"] = Relationship(
+        back_populates="audit_logs"
+    )

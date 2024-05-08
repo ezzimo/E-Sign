@@ -1,3 +1,6 @@
+import logging
+import sys
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
@@ -5,11 +8,13 @@ from app.api.deps import get_current_user, get_db
 from app.crud.signature_request_crud import (
     create_signature_request,
     delete_signature_request,
+    get_signatories_by_signature_request,
     get_signature_request,
     get_signature_requests_by_document,
     update_signature_request,
 )
 from app.models.user_model import User
+from app.schemas.signatory_schema import SignatoryOut
 from app.schemas.signature_request_schema import (
     SignatureRequestCreate,
     SignatureRequestRead,
@@ -17,10 +22,43 @@ from app.schemas.signature_request_schema import (
 )
 from app.utils import send_signature_request_email
 
+# Create a logger for your application
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stdout,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 
-@router.post("/", response_model=SignatureRequestRead)
+@router.post("/", response_model=SignatureRequestRead, status_code=201)
+def initiate_signature_request(
+    signature_request: SignatureRequestCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Initiate a new signature request.
+    """
+    signature_request_data = create_signature_request(
+        db=db, request_data=signature_request, sender_id=current_user.id
+    )
+
+    # Send an email notification to all signatories
+    for signatory in signature_request_data.signatories:
+        send_signature_request_email(
+            email_to=signatory.email,
+            document_title="signature request",
+            link="link_to_sign_document",
+            message=signature_request_data.message,
+        )
+
+    return signature_request_data
+
+
+@router.post("/create", response_model=SignatureRequestRead)
 def create_request(
     signature_request: SignatureRequestCreate,
     db: Session = Depends(get_db),
@@ -89,3 +127,18 @@ def delete_request(request_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Signature request not found")
     delete_signature_request(db=db, request_id=request_id)
     return {"message": "Signature request deleted successfully"}
+
+
+@router.get(
+    "/signature-request/{request_id}/signers", response_model=list[SignatoryOut]
+)
+def list_signature_request_signers(request_id: int, db: Session = Depends(get_db)):
+    """
+    List all signatories for a specific signature request.
+    """
+    signatories = get_signatories_by_signature_request(db, request_id)
+    if not signatories:
+        raise HTTPException(
+            status_code=404, detail="No signatories found for this signature request."
+        )
+    return signatories

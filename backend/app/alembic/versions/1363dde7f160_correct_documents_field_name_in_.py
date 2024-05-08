@@ -1,18 +1,18 @@
-"""Add default value to role field in User model
+"""Correct documents field name in SignatureRequest table
 
-Revision ID: 0e5802466e8d
-Revises: 6c2c3c03affa
-Create Date: 2024-04-03 16:20:20.225236
+Revision ID: 1363dde7f160
+Revises: 5bb042cf0b4c
+Create Date: 2024-04-26 12:12:50.820608
 
 """
-
 import sqlalchemy as sa
 import sqlmodel.sql.sqltypes
+
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "0e5802466e8d"
-down_revision = "6c2c3c03affa"
+revision = '1363dde7f160'
+down_revision = '5bb042cf0b4c'
 branch_labels = None
 depends_on = None
 

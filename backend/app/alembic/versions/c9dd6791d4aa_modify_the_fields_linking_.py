@@ -1,18 +1,18 @@
-"""Add Foreign Keys in User and Document models
+"""Modify the fields linking SignatureRequest to Signatory
 
-Revision ID: adacd68d1bda
-Revises: 72ed6056ff06
-Create Date: 2024-04-08 13:32:26.025353
+Revision ID: c9dd6791d4aa
+Revises: 841630e649fa
+Create Date: 2024-04-25 12:32:41.422199
 
 """
-from alembic import op
 import sqlalchemy as sa
 import sqlmodel.sql.sqltypes
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = 'adacd68d1bda'
-down_revision = '72ed6056ff06'
+revision = 'c9dd6791d4aa'
+down_revision = '841630e649fa'
 branch_labels = None
 depends_on = None
 

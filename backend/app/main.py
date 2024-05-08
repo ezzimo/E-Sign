@@ -1,3 +1,4 @@
+import logging
 import logging.config
 
 from fastapi import FastAPI
@@ -9,6 +10,11 @@ from app.core.config import settings
 
 # Configure logging
 logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
+
+# Now create a logger using the 'sampleLogger' defined in the configuration
+logger = logging.getLogger("sampleLogger")
+
+logger.info("Application started")
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
