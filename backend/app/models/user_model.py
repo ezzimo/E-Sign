@@ -1,11 +1,7 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
 
-from sqlmodel import Field, Relationship, SQLModel
-
-if TYPE_CHECKING:
-    from .document_model import Document
-    from .signature_request_model import SignatureRequest
+from sqlmodel import Field, SQLModel, Relationship
+from .document_model import Document
 
 
 class UserBase(SQLModel):
@@ -25,5 +21,4 @@ class User(UserBase, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-    documents: list["Document"] = Relationship(back_populates="owner")
-    sent_request: list["SignatureRequest"] = Relationship(back_populates="sender")
+    documents: Document = Relationship(back_populates="owner")

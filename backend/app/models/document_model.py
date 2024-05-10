@@ -4,12 +4,12 @@ from typing import TYPE_CHECKING
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, Relationship, SQLModel
 
-from .field_model import DocField
-from .requests_documents_link_model import RequestDocumentLink
-from .user_model import User
+# from .field_model import DocField
+# from .requests_documents_link_model import RequestDocumentLink
 
 if TYPE_CHECKING:
-    from .signature_request_model import SignatureRequest
+    # from .signature_request_model import SignatureRequest
+    from .user_model import User
 
 import enum
 
@@ -32,9 +32,13 @@ class DocumentBase(SQLModel):
 
 class Document(DocumentBase, table=True):
     owner_id: int = Field(foreign_key="user.id")
-    owner: "User" = Relationship(back_populates="documents")
-    doc_requests: list["SignatureRequest"] = Relationship(
-        back_populates="documents",
-        link_model=RequestDocumentLink,
+
+    # doc_requests: list["SignatureRequest"] = Relationship(
+    # back_populates="documents",
+    # link_model=RequestDocumentLink,
+    # )
+    owner: "User" = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Document.owner_id]"},
+        back_populates="documents"
     )
-    signature_fields: list["DocField"] = Relationship(back_populates="document")
+    # signature_fields: list["DocField"] = Relationship(back_populates="document")

@@ -16,6 +16,10 @@ export const $DocumentRead = {
 			type: "string",
 			isRequired: true,
 		},
+		file_url: {
+			type: "string",
+			isRequired: true,
+		},
 		status: {
 			type: "string",
 			isRequired: true,

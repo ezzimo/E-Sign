@@ -1,13 +1,13 @@
 import enum
 from datetime import datetime
-from typing import TYPE_CHECKING
+# from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, Relationship, SQLModel
 
-if TYPE_CHECKING:
-    from .document_model import Document
-    from .signature_request_model import SignatureRequest
+# if TYPE_CHECKING:
+# from .document_model import Document
+# from .signature_request_model import SignatureRequest
 
 
 class FieldType(enum.Enum):
@@ -37,8 +37,8 @@ class DocField(DocFieldBase, table=True):
     signature_request_id: int = Field(foreign_key="signaturerequest.id")
     signer_id: int | None = Field(default=None, foreign_key="signatory.id")
 
-    document: "Document" = Relationship(back_populates="signature_fields")
-    signature_request: "SignatureRequest" = Relationship(back_populates="fields")
+    # document: "Document" = Relationship(back_populates="signature_fields")
+    # signature_request: "SignatureRequest" = Relationship(back_populates="fields")
 
     optional: bool | None = Field(default=None)
     checked: bool | None = Field(default=None)

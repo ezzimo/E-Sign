@@ -5,12 +5,11 @@ from sqlalchemy import Enum
 from sqlmodel import Field, Relationship, SQLModel
 
 from .audit_log_model import AuditLog
-from .document_model import Document
-from .field_model import DocField
-from .requests_documents_link_model import RequestDocumentLink
+# from .document_model import Document
+# from .field_model import DocField
+# from .requests_documents_link_model import RequestDocumentLink
 from .requests_signatories_link_model import RequestSignatoryLink
 from .signatory_model import Signatory
-from .user_model import User
 
 
 class SignatureRequestStatus(str, enum.Enum):
@@ -49,14 +48,13 @@ class SignatureRequestBase(SQLModel):
 class SignatureRequest(SignatureRequestBase, table=True):
     sender_id: int = Field(foreign_key="user.id")
 
-    documents: list["Document"] = Relationship(
-        back_populates="doc_requests",
-        link_model=RequestDocumentLink,
-    )
-    sender: "User" = Relationship(back_populates="sent_request")
-    signatories: list["Signatory"] = Relationship(
+    # documents: list[Document] = Relationship(
+    # back_populates="doc_requests",
+    # link_model=RequestDocumentLink,
+    # )
+    signatories: list[Signatory] = Relationship(
         back_populates="signature_requests",
         link_model=RequestSignatoryLink,
     )
-    fields: list["DocField"] = Relationship(back_populates="signature_request")
-    audit_logs: list["AuditLog"] = Relationship(back_populates="signature_request")
+    # fields: list[DocField] = Relationship(back_populates="signature_request")
+    audit_logs: list[AuditLog] = Relationship(back_populates="signature_request")
