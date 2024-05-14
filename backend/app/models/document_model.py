@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, Relationship, SQLModel
@@ -25,6 +25,7 @@ class DocumentBase(SQLModel):
     id: int = Field(default=None, primary_key=True)
     title: str
     file: str
+    file_url: Optional[str] = None
     status: DocumentStatus = Field(sa_column=SAEnum(DocumentStatus))
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)

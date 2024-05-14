@@ -1,28 +1,25 @@
+import os
 import logging
 import logging.config
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
-
 from app.api.main import api_router
 from app.core.config import settings
+from app.mime_type_middleware import MIMETypeMiddleware
 
 # Configure logging
 logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
-
-# Now create a logger using the 'sampleLogger' defined in the configuration
 logger = logging.getLogger("sampleLogger")
-
 logger.info("Application started")
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
-    # Check if the route has tags and use the first tag as part of the unique ID
     if route.tags:
         return f"{route.tags[0]}-{route.name}"
     else:
-        # If no tags are present, use a default tag or another attribute for the unique ID
         return f"default-{route.name}"
 
 
@@ -31,6 +28,12 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     generate_unique_id_function=custom_generate_unique_id,
 )
+
+# Add the custom middleware
+app.add_middleware(MIMETypeMiddleware)
+
+# Mounting the document_files directory as static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:
@@ -49,6 +52,14 @@ if settings.BACKEND_CORS_ORIGINS:
 async def root():
     logging.getLogger("sampleLogger").debug("Test log message from the root route")
     return {"message": "Hello World"}
+
+
+@app.get("/test-static")
+async def test_static():
+    static_dir = "static"
+    files = os.listdir(static_dir)
+    logger.info(f"Static directory contents: {files}")
+    return {"static_files": files}
 
 
 app.include_router(api_router, prefix=settings.API_V1_STR)

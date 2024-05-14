@@ -38,6 +38,9 @@ services:
   backend:
     image: '${DOCKER_IMAGE_BACKEND?Variable not set}:${TAG-latest}'
     restart: always
+    volumes:
+      - ./app:/app
+      - ./static:/app/static
     networks:
       - traefik-public
       - default

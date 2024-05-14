@@ -51,4 +51,11 @@ export class DocumentService {
             mediaType: 'multipart/form-data',
         });
     }
+
+    public static async deleteDocument(id: number): Promise<void> {
+        return request<void>(OpenAPI, {
+            method: "DELETE",
+            url: `/api/v1/documents/${id}`,
+        });
+    }
 }

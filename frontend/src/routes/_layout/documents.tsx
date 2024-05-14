@@ -23,53 +23,48 @@ import useCustomToast from "../../hooks/useCustomToast";
 
 function Documents() {
 	const showToast = useCustomToast();
-	const {
-		data: documents,
-		isLoading,
-		isError,
-		error,
-	} = useQuery<DocumentRead[]>("documents", DocumentService.fetchDocuments);
+	const { data: documents, isLoading, isError, error } = useQuery<DocumentRead[]>("documents", DocumentService.fetchDocuments);
 
 	if (isError) {
-		const errDetail = (error as ApiError).body?.detail || "An error occurred";
-		showToast("Error loading documents", `${errDetail}`, "error");
+			const errDetail = (error as ApiError).body?.detail || "An error occurred";
+			showToast("Error loading documents", `${errDetail}`, "error");
 	}
 
 	return (
-		<Container maxW="full" pt="4">
-			<Heading size="lg">Document Management</Heading>
-			<Navbar type={"Document"} />
-			{isLoading ? (
-				<Flex justify="center" align="center" h="100vh">
-					<Spinner />
-				</Flex>
-			) : (
-				<TableContainer>
-					<Table variant="simple">
-						<Thead>
-							<Tr>
-								<Th>ID</Th>
-								<Th>Title</Th>
-								<Th>Status</Th>
-								<Th isNumeric>Actions</Th>
-							</Tr>
-						</Thead>
-						<Tbody>
-							{documents?.map((document) => (
-								<Tr key={document.id}>
-									<Td>{document.id}</Td>
-									<Td>{document.title}</Td>
-									<Td>{document.status}</Td>
-									<Td isNumeric>
-										<ActionsMenu type="Document" value={document} />
-									</Td>
-								</Tr>
-							))}
-						</Tbody>
-					</Table>
-				</TableContainer>
-			)}
-		</Container>
+			<Container maxW="full" pt="4">
+					<Heading size="lg">Document Management</Heading>
+					<Navbar type={"Document"} />
+					{isLoading ? (
+							<Flex justify="center" align="center" h="100vh">
+									<Spinner />
+							</Flex>
+					) : (
+							<TableContainer>
+									<Table variant="simple">
+											<Thead>
+													<Tr>
+															<Th>ID</Th>
+															<Th>Title</Th>
+															<Th>Status</Th>
+															<Th isNumeric>Actions</Th>
+													</Tr>
+											</Thead>
+											<Tbody>
+													{documents?.map((document) => (
+															<Tr key={document.id}>
+																	<Td>{document.id}</Td>
+																	<Td>{document.title}</Td>
+																	<Td>{document.status}</Td>
+																	<Td isNumeric>
+																			<ActionsMenu type="Document" value={document} />
+																	</Td>
+															</Tr>
+													))}
+											</Tbody>
+									</Table>
+							</TableContainer>
+					)}
+			</Container>
 	);
 }
 

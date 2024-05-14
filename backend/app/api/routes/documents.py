@@ -9,6 +9,8 @@ from app.crud import document_crud
 from app.models.document_model import Document
 from app.models.user_model import User
 from app.schemas.document_schema import DocumentCreate, DocumentOut, DocumentUpdate
+from app.services.file_service import save_file
+
 # from app.schemas.field_schema import FieldOut
 # from app.schemas.signature_request_schema import SignatureRequestRead
 
@@ -25,46 +27,34 @@ async def create_document(
     status: str = Form(...),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-) -> Any:
-    """
-    Create a new document with file upload.
-    """
-    # Step 1: Save the uploaded file to a secure location on the server
-    file_location = f"document_files/{current_user.id}_{file.filename}"
-    with open(file_location, "wb") as file_object:
-        file_content = await file.read()  # Read async to avoid blocking
-        file_object.write(file_content)
-
-    # Reset file pointer if needed elsewhere
-    await file.seek(0)
-
-    # Step 2: Construct a DocumentCreate schema instance with the received data
-    document_data = {
-        "title": title,
-        "status": status,
-        "file": file_location,
-        "owner_id": current_user.id,
-    }
-    # Ensure that `DocumentCreate` schema allows passing `owner_id` and adjusts for
-    # handling `status` appropriately
-    document_create = DocumentCreate(**document_data)
-
-    # Step 3: Use CRUD utility to save document metadata to the database
-    document = document_crud.create_document(
-        db=db, obj_in=document_create, owner_id=current_user.id
+) -> DocumentOut:
+    file_location = save_file(file, current_user.id)
+    document_in = DocumentCreate(
+        title=title,
+        status=status,
+        file=file_location,
+        owner_id=current_user.id,
+        file_url=file_location,
     )
-
+    document = document_crud.create_document(db=db, obj_in=document_in)
     return document
 
 
 @router.get("/{document_id}", response_model=DocumentOut)
-def read_document(*, db: Session = Depends(get_db), document_id: int):
+def read_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Get document by ID.
     """
     document = document_crud.get_document(db=db, document_id=document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+    document.file_url = document_crud.generate_document_file_url(
+        db, document_id, current_user.id
+    )
     return document
 
 
@@ -81,14 +71,7 @@ def read_documents(
     documents = db.exec(select(Document).offset(skip).limit(limit)).all()
     results = []
     for doc in documents:
-        try:
-            file_url = get_document_file_url(document_id=doc.id, current_user=current_user, db=db)
-        except HTTPException as e:
-            logger.error(f"Error fetching users: {str(e)}")
-            raise HTTPException(status_code=500, detail="Internal server error whene getting file url") from e
-            # Handle the error: could log it, set file_url to None, or use a default placeholder
-            file_url = None  # or 'Unavailable'
-
+        file_url = document_crud.generate_document_file_url(db, doc.id, current_user.id)
         doc_out = DocumentOut(
             id=doc.id,
             title=doc.title,
@@ -97,7 +80,7 @@ def read_documents(
             created_at=doc.created_at,
             updated_at=doc.updated_at,
             owner=doc.owner,
-            file_url=file_url
+            file_url=file_url,
         )
         results.append(doc_out)
     return results
@@ -108,7 +91,7 @@ async def update_document(
     document_id: int,
     title: Optional[str] = Form(None),
     status: Optional[str] = Form(None),
-    new_file: Optional[UploadFile] = File(None),  # Recognize as `new_file`
+    new_file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -119,15 +102,23 @@ async def update_document(
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
     if new_file:
-        # Handle new file upload
-        file_location = f"document_files/{current_user.id}_{new_file.filename}"
+        file_location = f"static/document_files/{current_user.id}_{new_file.filename}"
         with open(file_location, "wb") as file_object:
-            file_content = await new_file.read()  # Read async to avoid blocking
+            file_content = await new_file.read()
             file_object.write(file_content)
-        document_in = DocumentUpdate(title=title, status=status, file=file_location)
+        document_in = DocumentUpdate(
+            title=title,
+            status=status,
+            file=file_location,
+            file_url=f"http://localhost/static/{file_location}",
+        )
     else:
-        # Update other details without changing the file
-        document_in = DocumentUpdate(title=title, status=status, file=document.file)
+        document_in = DocumentUpdate(
+            title=title,
+            status=status,
+            file=document.file,
+            file_url=document.file_url,
+        )
 
     updated_document = document_crud.update_document(
         db=db, db_obj=document, obj_in=document_in
@@ -139,20 +130,20 @@ async def update_document(
 @router.delete("/{document_id}")
 def delete_document(
     document_id: int,
-    session: Session = Depends(get_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Delete a document. Superuser can delete any document. Regular users can only delete their documents.
+    Delete a document. Only superusers or the owner of the document can delete it.
     """
-    document = session.get(Document, document_id)
+    document = db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     if not current_user.is_superuser and document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    session.delete(document)
-    session.commit()
+    db.delete(document)
+    db.commit()
     return {"message": "Document deleted successfully"}
 
 
@@ -160,15 +151,16 @@ def delete_document(
 def get_document_file_url(
     document_id: int,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> str:
     """
-    Retrieve the file URL for visualization.
+    Retrieve the file URL for a specific document, ensuring that only authorized users can access it.
     """
     try:
-        file_path = document_crud.get_document_file(db, document_id, current_user.id)
-        # Secure URL generation, adjust based on your file-serving setup
-        file_url = f"{file_path}"  # Example path
+        file_url = document_crud.generate_document_file_url(
+            db, document_id, current_user.id
+        )
         return file_url
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Permission denied or document not found")
+    except HTTPException as exc:
+        logger.error(f"Failed to retrieve file URL: {exc.detail}")
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
