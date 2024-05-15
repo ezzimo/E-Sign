@@ -19,18 +19,18 @@ fileConfig("logging.conf", disable_existing_loggers=False)
 # target_metadata = mymodel.Base.metadata
 # target_metadata = None
 
-from app.models import signature_request_model  # noqa
 from app.models import (  # noqa
     audit_log_model,
     document_model,
+    field_model,
     models,
+    requests_documents_link_model,
+    requests_signatories_link_model,
     signatory_model,
+    signature_request_model,
     user_model,
 )
-from app.models.document_model import Document  # noqa
-from app.models.models import Item  # noqa
 from app.models.models import SQLModel  # noqa
-from app.models.user_model import User  # noqa
 
 target_metadata = SQLModel.metadata
 
