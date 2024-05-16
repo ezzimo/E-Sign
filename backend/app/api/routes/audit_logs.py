@@ -3,7 +3,7 @@ from sqlmodel import Session
 
 from app.api.deps import get_db
 from app.crud.audit_log_crud import create_audit_log, get_audit_logs_by_document
-from app.schemas.audit_log_schema import AuditLogCreate, AuditLogRead
+from app.schemas.schemas import AuditLogCreate, AuditLogRead
 
 router = APIRouter()
 

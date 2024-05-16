@@ -3,8 +3,8 @@ import logging
 from fastapi import HTTPException
 from sqlmodel import Session
 
-from app.models.field_model import DocField, FieldType, Radio
-from app.schemas.field_schema import FieldCreate, FieldUpdate
+from app.models.models import DocField, FieldType, Radio
+from app.schemas.schemas import FieldCreate, FieldUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def update_field(db: Session, field_id: int, field_data: FieldUpdate) -> DocFiel
         logger.error(f"Field with ID {field_id} not found")
         raise HTTPException(status_code=404, detail="Field not found")
 
-    for var, value in field_data.model_dump(exclude_unset=True).items():
+    for var, value in field_data.dict(exclude_unset=True).items():
         setattr(db_field, var, value)
 
     db.commit()

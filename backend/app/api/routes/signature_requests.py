@@ -13,9 +13,9 @@ from app.crud.signature_request_crud import (
     get_signature_requests_by_document,
     update_signature_request,
 )
-from app.models.user_model import User
-from app.schemas.signatory_schema import SignatoryOut
-from app.schemas.signature_request_schema import (
+from app.models.models import User
+from app.schemas.schemas import (
+    SignatoryOut,
     SignatureRequestCreate,
     SignatureRequestRead,
     SignatureRequestUpdate,

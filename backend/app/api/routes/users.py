@@ -9,8 +9,8 @@ from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
 from app.crud import user_crud
 from app.models.models import Message
-from app.models.user_model import User
-from app.schemas.user_schema import (
+from app.models.models import User
+from app.schemas.schemas import (
     UpdatePassword,
     UserCreate,
     UserCreateOpen,

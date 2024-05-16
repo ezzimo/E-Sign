@@ -1,18 +1,16 @@
+import os
 import logging
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_db
 from app.crud import document_crud
-from app.models.document_model import Document
-from app.models.user_model import User
-from app.schemas.document_schema import DocumentCreate, DocumentOut, DocumentUpdate
+from app.models.models import Document, User
+from app.schemas.schemas import DocumentCreate, DocumentOut, DocumentUpdate
 from app.services.file_service import save_file
-
-# from app.schemas.field_schema import FieldOut
-# from app.schemas.signature_request_schema import SignatureRequestRead
 
 # Create a logger for your application
 logger = logging.getLogger(__name__)
@@ -47,15 +45,19 @@ def read_document(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Get document by ID.
+    Get document by ID and return the PDF file content.
     """
     document = document_crud.get_document(db=db, document_id=document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
-    document.file_url = document_crud.generate_document_file_url(
-        db, document_id, current_user.id
+
+    file_path = document_crud.get_document_file(db, document_id, current_user.id)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(
+        file_path, media_type="application/pdf", filename=document.file.split("/")[-1]
     )
-    return document
 
 
 @router.get("/", response_model=list[DocumentOut])

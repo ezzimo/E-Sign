@@ -1,10 +1,14 @@
 import logging
 
 from sqlmodel import Session, select
+from fastapi import HTTPException
 
-from app.models.signatory_model import Signatory
-from app.models.user_model import User
-from app.schemas.signatory_schema import SignatoryCreate, SignatoryUpdate
+from app.models.models import (
+    Signatory,
+    User,
+    DocField,
+)
+from app.schemas.schemas import FieldCreate, SignatoryCreate, SignatoryUpdate
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -27,8 +31,13 @@ def create_signatory(
 
     # Create the new signatory
     signatory = Signatory(
-        **obj_in.model_dump(exclude_unset=True),
-        signer_id=signer_id,
+        first_name=obj_in.first_name,
+        last_name=obj_in.last_name,
+        email=obj_in.email,
+        phone_number=obj_in.phone_number,
+        role=obj_in.role,
+        signing_order=obj_in.signing_order,
+        user_id=signer_id,
         creator_id=creator_id,
         user=signer,
         creator=db.get(User, creator_id),
@@ -36,6 +45,29 @@ def create_signatory(
 
     # Persist the new signatory in the database
     db.add(signatory)
+    db.commit()
+    db.refresh(signatory)
+
+    # Create fields for the signatory
+    for field in obj_in.fields:
+        db_field = DocField(
+            type=field.type,
+            page=field.page,
+            signature_request_id="1",
+            document_id=field.document_id,
+            signer_id=signatory.id,
+            optional=field.optional,
+            mention=field.mention,
+            text=field.text,
+            # Only include coordinates if valid
+            x=field.x if field.x else None,
+            y=field.y if field.y else None,
+            height=field.height if field.height else None,
+            width=field.width if field.width else None,
+        )
+        # db_field = create_field(db, field_data=field, signatory_id=signatory.id)
+        signatory.fields.append(db_field)
+
     db.commit()
     db.refresh(signatory)
     logger.info(f"Created signatory {signatory.id} by user {creator_id}")
@@ -79,3 +111,24 @@ def delete_signatory(db: Session, signatory_id: int):
     db.delete(db_signatory)
     db.commit()
     logger.info(f"Deleted signatory {signatory_id}")
+
+
+def create_field_signatory(
+    db: Session, field_data: FieldCreate, signatory_id: int
+) -> DocField:
+    # Validate the field data
+    try:
+        field_data.validate_fields()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Create the DocField explicitly
+    db_field = DocField(
+        **field_data.model_dump(exclude_unset=True),
+        signer_id=signatory_id,
+    )
+
+    db.add(db_field)
+    db.commit()
+    db.refresh(db_field)
+    return db_field

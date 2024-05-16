@@ -3,10 +3,8 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.crud import user_crud
-from app.models import (
-    user_model,
-)
-from app.schemas.user_schema import UserCreate
+from app.models.models import User
+from app.schemas.schemas import UserCreate
 
 # Create the engine
 engine = create_engine(
@@ -21,7 +19,7 @@ def init_db(session: Session):
 
     superuser_email = settings.FIRST_SUPERUSER
 
-    user_query = select(user_model.User).where(user_model.User.email == superuser_email)
+    user_query = select(User).where(User.email == superuser_email)
     user = session.exec(user_query).first()
 
     if not user:

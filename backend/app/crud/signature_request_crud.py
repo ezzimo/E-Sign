@@ -3,11 +3,8 @@ import logging
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from app.models.document_model import Document
-from app.models.field_model import DocField
-from app.models.signatory_model import Signatory
-from app.models.signature_request_model import SignatureRequest
-from app.schemas.signature_request_schema import (
+from app.models.models import Document, DocField, Signatory, SignatureRequest
+from app.schemas.schemas import (
     SignatureRequestCreate,
     SignatureRequestUpdate,
 )

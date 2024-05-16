@@ -3,7 +3,7 @@ from sqlmodel import Session
 
 from app.api.deps import get_db
 from app.crud.field_crud import create_field, delete_field, get_field, update_field
-from app.schemas.field_schema import FieldCreate, FieldOut, FieldUpdate
+from app.schemas.schemas import FieldCreate, FieldOut, FieldUpdate
 
 router = APIRouter()
 

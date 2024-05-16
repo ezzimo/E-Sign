@@ -1,9 +1,10 @@
 import urllib.parse
+
 from fastapi import HTTPException
 from sqlmodel import Session
 
-from app.models.document_model import Document
-from app.schemas.document_schema import DocumentCreate, DocumentUpdate
+from app.models.models import Document
+from app.schemas.schemas import DocumentCreate, DocumentUpdate
 
 
 def create_document(db: Session, *, obj_in: DocumentCreate) -> Document:
@@ -70,4 +71,6 @@ def generate_document_file_url(db: Session, document_id: int, user_id: int) -> s
         raise HTTPException(status_code=403, detail="Document not found")
     elif document.owner_id != user_id:
         raise HTTPException(status_code=403, detail="Permission denied")
-    return f"http://localhost/static/document_files/{document.file.split('/')[-1]}"
+    return (
+        f"http://localhost/api/v1/static/document_files/{document.file.split('/')[-1]}"
+    )

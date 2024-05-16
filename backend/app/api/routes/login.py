@@ -11,7 +11,7 @@ from app.core.config import settings
 from app.core.security import get_password_hash
 from app.crud import user_crud
 from app.models.models import Message, NewPassword, Token
-from app.schemas.user_schema import UserOut
+from app.schemas.schemas import UserOut
 from app.utils import (
     generate_password_reset_token,
     generate_reset_password_email,

@@ -3,7 +3,7 @@ from sqlmodel import Session
 
 from app.api.deps import get_current_user_id, get_db
 from app.crud import signatory_crud
-from app.schemas.signatory_schema import SignatoryCreate, SignatoryOut, SignatoryUpdate
+from app.schemas.schemas import SignatoryCreate, SignatoryOut, SignatoryUpdate
 
 router = APIRouter()
 

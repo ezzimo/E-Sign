@@ -1,11 +1,12 @@
-import os
 import logging
 import logging.config
+import os
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
+
 from app.api.main import api_router
 from app.core.config import settings
 from app.mime_type_middleware import MIMETypeMiddleware

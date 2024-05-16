@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
 
-from app.models.audit_log_model import AuditLog
-from app.schemas.audit_log_schema import AuditLogCreate
+from app.models.models import AuditLog
+from app.schemas.schemas import AuditLogCreate
 
 
 def create_audit_log(db: Session, audit_log: AuditLogCreate) -> AuditLog:
