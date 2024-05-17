@@ -1,16 +1,17 @@
-import os
 import logging
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, Query
 from fastapi.responses import FileResponse
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_db
 from app.crud import document_crud
 from app.models.models import Document, User
 from app.schemas.schemas import DocumentCreate, DocumentOut, DocumentUpdate
 from app.services.file_service import save_file
+from pathlib import Path
+from app.services.file_service import BASE_DIR
 
 # Create a logger for your application
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ async def create_document(
     document_in = DocumentCreate(
         title=title,
         status=status,
-        file=file_location,
+        file=file.filename,
         owner_id=current_user.id,
         file_url=file_location,
     )
@@ -43,21 +44,47 @@ def read_document(
     document_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    download: Optional[bool] = Query(False, description="Whether to download the file"),
 ):
     """
     Get document by ID and return the PDF file content.
     """
-    document = document_crud.get_document(db=db, document_id=document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    document = document_crud.get_document_by_id(db, document_id)
 
-    file_path = document_crud.get_document_file(db, document_id, current_user.id)
-    if not os.path.exists(file_path):
+    # Ensure the current user has access to the document
+    if not current_user.is_superuser and document.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    if download:
+        file_path = Path(BASE_DIR) / "static" / "document_files" / document.file
+        logger.info(f"display the path==========>: {file_path}")
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="File end point not found")
+        return FileResponse(path=file_path, filename=file_path.name, media_type='application/pdf')
+
+    return document
+
+
+@router.get("/{document_id}/file", response_class=FileResponse)
+def get_document_file(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    """
+    Get document file by ID and return the file.
+    """
+    document = document_crud.get_document_by_id(db, document_id)
+
+    # Ensure the current user has access to the document
+    if not current_user.is_superuser and document.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    file_path = Path("static/document_files") / document.file
+    if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(
-        file_path, media_type="application/pdf", filename=document.file.split("/")[-1]
-    )
+    return FileResponse(path=file_path, filename=file_path.name, media_type='application/pdf')
 
 
 @router.get("/", response_model=list[DocumentOut])
@@ -70,10 +97,9 @@ def read_documents(
     """
     Retrieve documents with manual mapping, including file URLs.
     """
-    documents = db.exec(select(Document).offset(skip).limit(limit)).all()
+    documents = document_crud.get_documents_by_user(db, current_user, skip, limit)
     results = []
     for doc in documents:
-        file_url = document_crud.generate_document_file_url(db, doc.id, current_user.id)
         doc_out = DocumentOut(
             id=doc.id,
             title=doc.title,
@@ -82,7 +108,7 @@ def read_documents(
             created_at=doc.created_at,
             updated_at=doc.updated_at,
             owner=doc.owner,
-            file_url=file_url,
+            file_url=doc.file_url,
         )
         results.append(doc_out)
     return results

@@ -128,6 +128,14 @@ class DocumentOut(DocumentBase):
     )
     owner: UserOut = Field(..., description="User information of the owner")
 
+    @validator('file_url')
+    def validate_file_url(cls, value):
+        # TODO Perform validation or sanitization
+        return value
+
+    class Config:
+        from_attributes = True
+
 
 class FieldBase(BaseModel):
     type: FieldType

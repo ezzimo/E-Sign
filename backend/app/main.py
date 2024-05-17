@@ -9,7 +9,6 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.api.main import api_router
 from app.core.config import settings
-from app.mime_type_middleware import MIMETypeMiddleware
 
 # Configure logging
 logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
@@ -30,11 +29,10 @@ app = FastAPI(
     generate_unique_id_function=custom_generate_unique_id,
 )
 
-# Add the custom middleware
-app.add_middleware(MIMETypeMiddleware)
-
-# Mounting the document_files directory as static files
+# Mount the static files directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.include_router(api_router, prefix="/api/v1")
 
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:

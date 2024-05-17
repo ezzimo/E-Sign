@@ -1,3 +1,5 @@
+// frontend/src/client/services/DocumentService.ts
+
 import type {
     DocumentCreate,
     DocumentRead,
@@ -56,6 +58,24 @@ export class DocumentService {
         return request<void>(OpenAPI, {
             method: "DELETE",
             url: `/api/v1/documents/${id}`,
+        });
+    }
+
+    public static async fetchDocumentById(id: number): Promise<DocumentRead> {
+        return request<DocumentRead>(OpenAPI, {
+            method: "GET",
+            url: `/api/v1/documents/${id}`,
+        });
+    }
+
+    public static async fetchDocumentFile(id: number): Promise<Response> {
+        return request<Response>(OpenAPI, {
+            method: "GET",
+            url: `/api/v1/documents/${id}?download=true`,
+            responseType: "blob", // Use the new responseType property
+            headers: {
+                Authorization: `Bearer ${OpenAPI.TOKEN}`,
+            },
         });
     }
 }

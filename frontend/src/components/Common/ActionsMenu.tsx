@@ -1,3 +1,5 @@
+// frontend/src/components/Common/ActionsMenu.tsx
+
 import React from "react";
 import {
     Button,
@@ -22,7 +24,7 @@ import EditUser from "../Admin/EditUser";
 import EditDocument from "../Documents/Editdocument";
 import EditItem from "../Items/EditItem";
 import DeleteAlert from "./DeleteAlert";
-import DocumentViewer from "../Documents/DocumentViewer";
+import { DocumentViewer } from "../Documents/DocumentViewer"; // Import as named export
 import { DocumentService } from "../../client/services/DocumentService";
 
 interface ActionsMenuProps {
@@ -31,31 +33,11 @@ interface ActionsMenuProps {
     disabled?: boolean;
 }
 
-// Function to derive the file type based on the file extension
-const getFileTypeFromExtension = (fileUrl: string): string => {
-    const extension = fileUrl.split(".").pop()?.toLowerCase();
-    switch (extension) {
-        case "pdf":
-            return "application/pdf";
-        case "jpg":
-        case "jpeg":
-        case "png":
-        case "gif":
-            return `image/${extension}`;
-        default:
-            return "application/octet-stream"; // Fallback for other file types
-    }
-};
-
 const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
     const editModal = useDisclosure();
     const deleteModal = useDisclosure();
     const viewModal = useDisclosure();
     const toast = useToast();
-
-    // Get file URL and derive file type for documents
-    const fileUrl = type === "Document" ? decodeURIComponent((value as DocumentRead).file_url) : "";
-    const fileType = getFileTypeFromExtension(fileUrl);
 
     const handleDelete = async () => {
         try {
@@ -158,8 +140,7 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
                     <ModalBody>
                         {type === "Document" && (
                             <DocumentViewer
-                                fileUrl={fileUrl}
-                                fileType={fileType}
+                                documentID={value.id as number}
                             />
                         )}
                     </ModalBody>

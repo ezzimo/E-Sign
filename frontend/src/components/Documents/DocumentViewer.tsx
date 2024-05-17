@@ -1,31 +1,53 @@
-import React from "react";
+import React, { useEffect, useState, useRef } from "react";
+import { DocumentService } from "../../client/services/DocumentService";
+import { DocumentRead } from "../../client/models/DocumentRead";
 
 interface DocumentViewerProps {
-    fileUrl: string;
-    fileType: string;
-    fileName?: string;
-    additionalInfo?: string;
+    documentID: number;
 }
 
-const DocumentViewer: React.FC<DocumentViewerProps> = ({ fileUrl, fileType, fileName, additionalInfo }) => {
-    const decodedFileUrl = decodeURIComponent(fileUrl);
+export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documentID }) => {
+    const [document, setDocument] = useState<DocumentRead | null>(null);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    useEffect(() => {
+        const fetchDocument = async () => {
+            try {
+                const fetchedDocument = await DocumentService.fetchDocumentById(documentID);
+                setDocument(fetchedDocument);
+            } catch (error) {
+                console.error("Error fetching document:", error);
+            }
+        };
+
+        fetchDocument();
+    }, [documentID]);
+
+    useEffect(() => {
+        const fetchDocumentFile = async () => {
+            try {
+                const response = await DocumentService.fetchDocumentFile(documentID);
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                if (iframeRef.current) {
+                    iframeRef.current.src = url;
+                }
+            } catch (error) {
+                console.error("Error fetching document file:", error);
+            }
+        };
+
+        fetchDocumentFile();
+    }, [documentID]);
+
+    if (!document) {
+        return <div>Loading...</div>;
+    }
 
     return (
         <div>
-            {fileName && <h3>File Name: {fileName}</h3>}
-            {additionalInfo && <p>{additionalInfo}</p>}
-
-            {fileType === "application/pdf" ? (
-                <iframe src={decodedFileUrl} width="100%" height="600px" />
-            ) : fileType.startsWith("image/") ? (
-                <img src={decodedFileUrl} alt="Document" style={{ width: "100%", height: "auto" }} />
-            ) : (
-                <a href={decodedFileUrl} download>
-                    Download Document
-                </a>
-            )}
+            <h3>{document.title}</h3>
+            <iframe ref={iframeRef} width="100%" height="600px" />
         </div>
     );
 };
-
-export default DocumentViewer;
