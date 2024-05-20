@@ -1,5 +1,3 @@
-// frontend/src/client/services/DocumentService.ts
-
 import type {
     DocumentCreate,
     DocumentRead,
@@ -68,14 +66,18 @@ export class DocumentService {
         });
     }
 
-    public static async fetchDocumentFile(id: number): Promise<Response> {
-        return request<Response>(OpenAPI, {
+    public static async fetchDocumentFile(id: number): Promise<Blob> {
+        const response = await fetch(`${OpenAPI.BASE}/api/v1/documents/${id}/download`, {
             method: "GET",
-            url: `/api/v1/documents/${id}?download=true`,
-            responseType: "blob", // Use the new responseType property
             headers: {
                 Authorization: `Bearer ${OpenAPI.TOKEN}`,
             },
         });
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch document file");
+        }
+
+        return response.blob();
     }
 }

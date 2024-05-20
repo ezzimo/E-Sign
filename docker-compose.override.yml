@@ -53,7 +53,7 @@ services:
       - "8888:8888"
     volumes:
       - ./backend/:/app
-      - ./static:/app/static
+      - ./backend/static:/app/static
     build:
       context: ./backend
       args:

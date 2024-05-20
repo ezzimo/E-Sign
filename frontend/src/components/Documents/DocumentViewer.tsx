@@ -1,53 +1,64 @@
-import React, { useEffect, useState, useRef } from "react";
-import { DocumentService } from "../../client/services/DocumentService";
+import React, { useEffect, useState } from "react";
 import { DocumentRead } from "../../client/models/DocumentRead";
+import { Document, Page, pdfjs } from 'react-pdf';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
+
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface DocumentViewerProps {
-    documentID: number;
+    documentDetails: DocumentRead;
+    fileBlob: Blob;
+    fileType: string;
+    fileName?: string;
+    additionalInfo?: string;
 }
 
-export const DocumentViewer: React.FC<DocumentViewerProps> = ({ documentID }) => {
-    const [document, setDocument] = useState<DocumentRead | null>(null);
-    const iframeRef = useRef<HTMLIFrameElement>(null);
+const DocumentViewer: React.FC<DocumentViewerProps> = ({ documentDetails, fileBlob, fileType }) => {
+    const [fileUrl, setFileUrl] = useState<string>('');
 
     useEffect(() => {
-        const fetchDocument = async () => {
-            try {
-                const fetchedDocument = await DocumentService.fetchDocumentById(documentID);
-                setDocument(fetchedDocument);
-            } catch (error) {
-                console.error("Error fetching document:", error);
-            }
+        const reader = new FileReader();
+        reader.readAsDataURL(fileBlob);
+        reader.onloadend = () => {
+            const base64String = (reader.result as string);
+            setFileUrl(base64String);
         };
+    }, [fileBlob]);
 
-        fetchDocument();
-    }, [documentID]);
+    const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+        setNumPages(numPages);
+    };
 
-    useEffect(() => {
-        const fetchDocumentFile = async () => {
-            try {
-                const response = await DocumentService.fetchDocumentFile(documentID);
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                if (iframeRef.current) {
-                    iframeRef.current.src = url;
-                }
-            } catch (error) {
-                console.error("Error fetching document file:", error);
-            }
-        };
-
-        fetchDocumentFile();
-    }, [documentID]);
-
-    if (!document) {
-        return <div>Loading...</div>;
-    }
+    const [numPages, setNumPages] = useState<number | null>(null);
+    const [pageNumber, setPageNumber] = useState<number>(1);
 
     return (
         <div>
-            <h3>{document.title}</h3>
-            <iframe ref={iframeRef} width="100%" height="600px" />
+            <h3>Title: {documentDetails.title}</h3>
+            {documentDetails.file && <h3>File Name: {documentDetails.file}</h3>}
+            {fileType === "application/pdf" ? (
+                <div>
+                    <Document
+                        file={fileUrl}
+                        onLoadSuccess={onDocumentLoadSuccess}
+                    >
+                        <Page pageNumber={pageNumber} />
+                    </Document>
+                    <div>
+                        <button onClick={() => setPageNumber(pageNumber - 1)} disabled={pageNumber <= 1}>Previous</button>
+                        <span>Page {pageNumber} of {numPages}</span>
+                        <button onClick={() => setPageNumber(pageNumber + 1)} disabled={pageNumber >= (numPages || 1)}>Next</button>
+                    </div>
+                </div>
+            ) : fileType.startsWith("image/") ? (
+                <img src={fileUrl} alt="Document" style={{ width: "100%", height: "auto" }} />
+            ) : (
+                <a href={fileUrl} download={documentDetails.file}>
+                    Download Document
+                </a>
+            )}
         </div>
     );
 };
+
+export default DocumentViewer;

@@ -1,6 +1,4 @@
-// frontend/src/components/Common/ActionsMenu.tsx
-
-import React from "react";
+import React, { useState } from "react";
 import {
     Button,
     Menu,
@@ -24,7 +22,7 @@ import EditUser from "../Admin/EditUser";
 import EditDocument from "../Documents/Editdocument";
 import EditItem from "../Items/EditItem";
 import DeleteAlert from "./DeleteAlert";
-import { DocumentViewer } from "../Documents/DocumentViewer"; // Import as named export
+import DocumentViewer from "../Documents/DocumentViewer";
 import { DocumentService } from "../../client/services/DocumentService";
 
 interface ActionsMenuProps {
@@ -38,6 +36,9 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
     const deleteModal = useDisclosure();
     const viewModal = useDisclosure();
     const toast = useToast();
+
+    const [documentDetails, setDocumentDetails] = useState<DocumentRead | null>(null);
+    const [fileBlob, setFileBlob] = useState<Blob | null>(null);
 
     const handleDelete = async () => {
         try {
@@ -61,6 +62,27 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
             });
         } finally {
             deleteModal.onClose();
+        }
+    };
+
+    const handleViewDocument = async () => {
+        try {
+            const details = await DocumentService.fetchDocumentById(value.id as number);
+            setDocumentDetails(details);
+
+            // Fetch the document file blob
+            const file = await DocumentService.fetchDocumentFile(value.id as number);
+            setFileBlob(file);
+
+            viewModal.onOpen();
+        } catch (error) {
+            toast({
+                title: "Error viewing document.",
+                description: "An error occurred while fetching the document.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
         }
     };
 
@@ -107,7 +129,7 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
                     Actions
                 </MenuButton>
                 <MenuList>
-                    <MenuItem icon={<FiEye />} onClick={viewModal.onOpen}>
+                    <MenuItem icon={<FiEye />} onClick={handleViewDocument}>
                         View {type}
                     </MenuItem>
                     <MenuItem icon={<FiEdit />} onClick={editModal.onOpen}>
@@ -127,20 +149,21 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
                     onClose={deleteModal.onClose}
                     id={Number(value.id)}
                     type={type}
-                    onDelete={handleDelete} // Pass the delete handler
+                    onDelete={handleDelete}
                 />
             </Menu>
 
-            {/* Modal to display the DocumentViewer */}
             <Modal isOpen={viewModal.isOpen} onClose={viewModal.onClose} size="xl">
                 <ModalOverlay />
                 <ModalContent>
-                    <ModalHeader>View {type}</ModalHeader>
+                    <ModalHeader>View Document</ModalHeader>
                     <ModalCloseButton />
                     <ModalBody>
-                        {type === "Document" && (
+                        {type === "Document" && documentDetails && fileBlob && (
                             <DocumentViewer
-                                documentID={value.id as number}
+                                documentDetails={documentDetails}
+                                fileBlob={fileBlob}
+                                fileType="application/pdf"
                             />
                         )}
                     </ModalBody>

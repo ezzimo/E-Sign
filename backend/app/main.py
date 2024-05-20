@@ -15,6 +15,8 @@ logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
 logger = logging.getLogger("sampleLogger")
 logger.info("Application started")
 
+logger.info(f"Current working directory: {os.getcwd()}")
+
 
 def custom_generate_unique_id(route: APIRoute) -> str:
     if route.tags:
