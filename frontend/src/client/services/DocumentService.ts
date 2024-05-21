@@ -1,3 +1,4 @@
+import axios from "axios";
 import type {
     DocumentCreate,
     DocumentRead,
@@ -67,17 +68,13 @@ export class DocumentService {
     }
 
     public static async fetchDocumentFile(id: number): Promise<Blob> {
-        const response = await fetch(`${OpenAPI.BASE}/api/v1/documents/${id}/download`, {
-            method: "GET",
+        const token = localStorage.getItem("access_token");
+        const response = await axios.get(`${OpenAPI.BASE}/api/v1/documents/${id}/download`, {
             headers: {
-                Authorization: `Bearer ${OpenAPI.TOKEN}`,
+                Authorization: `Bearer ${token}`,
             },
+            responseType: "blob",
         });
-
-        if (!response.ok) {
-            throw new Error("Failed to fetch document file");
-        }
-
-        return response.blob();
+        return response.data;
     }
 }

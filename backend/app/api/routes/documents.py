@@ -52,7 +52,15 @@ def read_document(
     if not current_user.is_superuser and document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    document_out = DocumentOut.from_orm(document)
+    document_out = DocumentOut(
+        id=document.id,
+        title=document.title,
+        file=document.file,
+        status=document.status.value,
+        created_at=document.created_at,
+        updated_at=document.updated_at,
+        owner=document.owner,
+    )
     document_out.file_url = f"/api/v1/documents/{document_id}/download"
     return document_out
 

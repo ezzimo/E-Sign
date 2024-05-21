@@ -69,11 +69,11 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
         try {
             const details = await DocumentService.fetchDocumentById(value.id as number);
             setDocumentDetails(details);
-
+    
             // Fetch the document file blob
             const file = await DocumentService.fetchDocumentFile(value.id as number);
             setFileBlob(file);
-
+    
             viewModal.onOpen();
         } catch (error) {
             toast({
