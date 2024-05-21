@@ -8,6 +8,7 @@ from app.api.deps import get_current_user, get_db
 from app.crud.signature_request_crud import (
     create_signature_request,
     delete_signature_request,
+    get_all_signature_requests,
     get_signatories_by_signature_request,
     get_signature_request,
     get_signature_requests_by_document,
@@ -31,6 +32,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+@router.get("/", response_model=list[SignatureRequestRead])
+def list_signature_requests(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    List all signature requests for the admin or the current user.
+    """
+    signature_requests = get_all_signature_requests(db=db, current_user=current_user)
+    return signature_requests
 
 
 @router.post("/", response_model=SignatureRequestRead, status_code=201)

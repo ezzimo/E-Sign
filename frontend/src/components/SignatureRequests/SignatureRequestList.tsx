@@ -1,32 +1,85 @@
-import { useEffect, useState } from "react";
-import { SignatureRequestRead } from "../../client/models/SignatureRequestRead";
 import { fetchSignatureRequests } from "../../client/services/SignatureRequestsService";
+import {
+  Container,
+  Flex,
+  Heading,
+  Spinner,
+  Table,
+  TableContainer,
+  Tbody,
+  Td,
+  Th,
+  Thead,
+  Tr,
+} from "@chakra-ui/react";
+import { useQuery } from "react-query";
+import { type ApiError } from "../../client";
+import ActionsMenu from "../Common/ActionsMenu";
+import Navbar from "../Common/Navbar";
+import useCustomToast from "../../hooks/useCustomToast";
 
 const SignatureRequestList = () => {
-	const [signatureRequests, setSignatureRequests] = useState<
-		SignatureRequestRead[]
-	>([]);
+  const showToast = useCustomToast();
+  const {
+    data: signatureRequests,
+    isLoading,
+    isError,
+    error,
+  } = useQuery("signatureRequests", fetchSignatureRequests);
 
-	useEffect(() => {
-		async function loadSignatureRequests() {
-			const requests = await fetchSignatureRequests();
-			setSignatureRequests(requests);
-		}
-		loadSignatureRequests();
-	}, []);
+  if (isError) {
+    const errDetail = (error as ApiError).body?.detail;
+    showToast("Something went wrong.", `${errDetail}`, "error");
+  }
 
-	return (
-		<div>
-			<h1>Signature Requests</h1>
-			{signatureRequests.map((request) => (
-				<div key={request.id}>
-					<h2>{request.name}</h2>
-					<p>Delivery Mode: {request.delivery_mode}</p>
-					<p>Expiration Date: {request.expiration_date}</p>
-				</div>
-			))}
-		</div>
-	);
+  return (
+    <>
+      {isLoading ? (
+        <Flex justify="center" align="center" height="100vh" width="full">
+          <Spinner size="xl" color="ui.main" />
+        </Flex>
+      ) : (
+        signatureRequests && (
+          <Container maxW="full">
+            <Heading
+              size="lg"
+              textAlign={{ base: "center", md: "left" }}
+              pt={12}
+            >
+              Signature Requests Management
+            </Heading>
+            <Navbar type={"Request"} />
+            <TableContainer>
+              <Table size={{ base: "sm", md: "md" }}>
+                <Thead>
+                  <Tr>
+                    <Th>ID</Th>
+                    <Th>Name</Th>
+                    <Th>Delivery Mode</Th>
+                    <Th>Expiration Date</Th>
+                    <Th>Actions</Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {signatureRequests.map((request) => (
+                    <Tr key={request.id}>
+                      <Td>{request.id}</Td>
+                      <Td>{request.name}</Td>
+                      <Td>{request.delivery_mode}</Td>
+                      <Td>{request.expiration_date || "N/A"}</Td>
+                      <Td>
+                        <ActionsMenu type={"SignatureRequest"} value={request} />
+                      </Td>
+                    </Tr>
+                  ))}
+                </Tbody>
+              </Table>
+            </TableContainer>
+          </Container>
+        )
+      )}
+    </>
+  );
 };
 
 export default SignatureRequestList;

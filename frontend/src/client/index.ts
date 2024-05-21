@@ -29,6 +29,7 @@ export type { DocumentRead } from "./models/DocumentRead";
 export type { DocumentResponse } from "./models/DocumentResponse";
 export type { DocumentsRead } from "./models/DocumentsRead";
 export type { DocumentUpdate } from "./models/DocumentUpdate";
+export type { SignatureRequestCreate } from "./models/SignatureRequestCreate";
 
 export { $Body_login_login_access_token } from "./schemas/$Body_login_login_access_token";
 export { $HTTPValidationError } from "./schemas/$HTTPValidationError";
@@ -52,6 +53,7 @@ export { $DocumentRead } from "./schemas/$DocumentRead";
 export { $DocumentResponse } from "./schemas/$DocumentResponse";
 export { $DocumentsRead } from "./schemas/$DocumentsRead";
 export { $DocumentUpdate } from "./schemas/$DocumentUpdate";
+export { $SignatureRequestCreateSchema } from "./schemas/$SignatureRequestCreate"; 
 
 export { ItemsService } from "./services/ItemsService";
 export { LoginService } from "./services/LoginService";

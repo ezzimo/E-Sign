@@ -3,7 +3,7 @@ import logging
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from app.models.models import Document, DocField, Signatory, SignatureRequest
+from app.models.models import Document, DocField, Signatory, SignatureRequest, User
 from app.schemas.schemas import (
     SignatureRequestCreate,
     SignatureRequestUpdate,
@@ -127,3 +127,16 @@ def get_signatories_by_signature_request(
     Retrieve all signatories related to a specific signature request.
     """
     return db.exec(select(Signatory).where(Signatory.signatory_id == request_id)).all()
+
+
+def get_all_signature_requests(db: Session, current_user: User) -> list[SignatureRequest]:
+    """
+    Retrieve all signature requests. If the user is an admin, fetch all requests,
+    otherwise fetch only the requests created by the user.
+    """
+    if current_user.is_superuser:
+        return db.exec(select(SignatureRequest)).all()
+    else:
+        return db.exec(
+            select(SignatureRequest).where(SignatureRequest.sender_id == current_user.id)
+        ).all()

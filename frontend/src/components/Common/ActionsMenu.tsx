@@ -18,6 +18,7 @@ import { BsThreeDotsVertical } from "react-icons/bs";
 import { FiEdit, FiTrash, FiEye } from "react-icons/fi";
 import { ItemOut, UserOut } from "../../client";
 import { DocumentRead } from "../../client/models/DocumentRead";
+import { SignatureRequestRead } from "../../client/models/SignatureRequestRead";
 import EditUser from "../Admin/EditUser";
 import EditDocument from "../Documents/Editdocument";
 import EditItem from "../Items/EditItem";
@@ -27,7 +28,7 @@ import { DocumentService } from "../../client/services/DocumentService";
 
 interface ActionsMenuProps {
     type: string;
-    value: ItemOut | UserOut | DocumentRead;
+    value: ItemOut | UserOut | DocumentRead | SignatureRequestRead;
     disabled?: boolean;
 }
 
@@ -112,6 +113,14 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
                         onClose={editModal.onClose}
                     />
                 );
+                case "Document":
+                    return (
+                        <EditDocument
+                            document={value as DocumentRead}
+                            isOpen={editModal.isOpen}
+                            onClose={editModal.onClose}
+                        />
+                    );
             default:
                 return null;
         }
