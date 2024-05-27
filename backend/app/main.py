@@ -32,9 +32,9 @@ app = FastAPI(
 )
 
 # Mount the static files directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/api/v1/static", StaticFiles(directory="static"), name="static")
 
-app.include_router(api_router, prefix="/api/v1")
+# app.include_router(api_router, prefix="/api/v1")
 
 # Set all CORS enabled origins
 if settings.BACKEND_CORS_ORIGINS:

@@ -23,8 +23,9 @@ def create_signature_request(
         name=request_data.name,
         delivery_mode=request_data.delivery_mode,
         ordered_signers=request_data.ordered_signers,
+        message=request_data.message,
         reminder_settings=request_data.reminder_settings,
-        expiration_date=request_data.expiration_date,
+        expiration_date=request_data.expiry_date,
         sender_id=sender_id,
     )
     db.add(signature_request)
@@ -82,8 +83,8 @@ def create_signature_request(
             db.commit()
             db.refresh(new_field)
 
-        db.commit()
-
+    db.commit()
+    db.refresh(signature_request)
     return signature_request
 
 

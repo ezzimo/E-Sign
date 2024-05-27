@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_db
@@ -22,7 +22,8 @@ from app.schemas.schemas import (
     SignatureRequestRead,
     SignatureRequestUpdate,
 )
-from app.utils import send_signature_request_email, generate_secure_link
+from app.utils import send_signature_request_email
+from app.services.file_service import generate_secure_link
 
 # Create a logger for your application
 logging.basicConfig(
@@ -47,7 +48,7 @@ def list_signature_requests(
     return signature_requests
 
 
-@router.post("/", response_model=SignatureRequestRead, status_code=201)
+@router.post("/", response_model=SignatureRequestRead, status_code=status.HTTP_201_CREATED)
 def initiate_signature_request(
     signature_request: SignatureRequestCreate,
     db: Session = Depends(get_db),
@@ -58,7 +59,7 @@ def initiate_signature_request(
     """
     if len(signature_request.signatories) == 0:
         raise HTTPException(
-            status_code=400, detail="At least one signatory is required."
+            status_code=status.HTTP_400_BAD_REQUEST, detail="At least one signatory is required."
         )
 
     signature_request_data = create_signature_request(
@@ -67,24 +68,28 @@ def initiate_signature_request(
 
     email_response = None
     if len(signature_request.signatories) == 1:
-        signatory = signature_request.signatories[0]
+        signatory = signature_request_data.signatories[0]
         secure_link = generate_secure_link(
-            signatory.info.email, int(signature_request.documents[0])
+            signatory.email,
+            [document.id for document in signature_request_data.documents],
+            signatory.id,
         )
         email_response = send_signature_request_email(
-            email_to=signatory.info.email,
+            email_to=signatory.email,
             document_title="signature request",
             link=secure_link,
             message=signature_request_data.message,
         )
     else:
-        signature_request.signatories.sort(key=lambda s: s.info.signing_order)
-        first_signatory = signature_request.signatories[0]
+        signature_request_data.signatories.sort(key=lambda s: s.signing_order)
+        first_signatory = signature_request_data.signatories[0]
         secure_link = generate_secure_link(
-            first_signatory.info.email, int(signature_request.documents[0])
+            first_signatory.email,
+            [document.id for document in signature_request_data.documents],
+            first_signatory.id,
         )
         email_response = send_signature_request_email(
-            email_to=first_signatory.info.email,
+            email_to=first_signatory.email,
             document_title="signature request",
             link=secure_link,
             message=signature_request_data.message,
@@ -92,43 +97,21 @@ def initiate_signature_request(
 
     if email_response and email_response.status_code == 250:
         # Email sent successfully, update document status
-        document_id = int(signature_request.documents[0])
-        document = document_crud.get_document_by_id(db, document_id)
-        if document:
-            document.status = DocumentStatus.SENT_FOR_SIGNATURE
-            db.add(document)
-            db.commit()
-            db.refresh(document)
+        for document_id in signature_request.documents:
+            document = document_crud.get_document_by_id(db, document_id)
+            if document:
+                document.status = DocumentStatus.SENT_FOR_SIGNATURE
+                db.add(document)
+        db.commit()
     else:
         # Email sending failed, raise an error
         error_message = f"""
             Failed to send email:{email_response.status_text if email_response else 'No response'}
         """
         logging.error(error_message)
-        raise HTTPException(status_code=500, detail=error_message)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message)
 
     return signature_request_data
-
-
-@router.post("/create", response_model=SignatureRequestRead)
-def create_request(
-    signature_request: SignatureRequestCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Create a new signature request.
-    """
-    request = create_signature_request(
-        db=db, request=signature_request, sender_id=current_user.id
-    )
-    signatory_email = db.get(User, request.signatory_id).email
-    send_signature_request_email(
-        email_to=signatory_email,
-        link="link_to_sign_document",
-        message=request.message,
-    )
-    return request
 
 
 @router.get("/{request_id}", response_model=SignatureRequestRead)
