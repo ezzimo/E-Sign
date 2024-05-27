@@ -1,5 +1,6 @@
 import secrets
 import warnings
+import logging
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -72,9 +73,9 @@ class Settings(BaseSettings):
     SMTP_HOST: str | None = None
     SMTP_USER: str | None = None
     SMTP_PASSWORD: str | None = None
-    # TODO: update type to EmailStr when sqlmodel supports it
     EMAILS_FROM_EMAIL: str | None = None
     EMAILS_FROM_NAME: str | None = None
+    FRONTEND_URL: str
 
     @model_validator(mode="after")
     def _set_default_emails_from(self) -> Self:
@@ -87,12 +88,16 @@ class Settings(BaseSettings):
     @computed_field  # type: ignore[misc]
     @property
     def emails_enabled(self) -> bool:
-        # return bool(self.SMTP_HOST and self.EMAILS_FROM_EMAIL)
-        return False
+        logging.info("enabled email")
+        return all([
+            self.SMTP_HOST,
+            self.SMTP_PORT,
+            self.EMAILS_FROM_EMAIL,
+            self.SMTP_USER,
+            self.SMTP_PASSWORD,
+        ])
 
-    # TODO: update type to EmailStr when sqlmodel supports it
     EMAIL_TEST_USER: str = "test@example.com"
-    # TODO: update type to EmailStr when sqlmodel supports it
     FIRST_SUPERUSER: str
     FIRST_SUPERUSER_PASSWORD: str
     USERS_OPEN_REGISTRATION: bool = False

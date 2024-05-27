@@ -49,6 +49,8 @@ def send_email(
     response = message.send(to=email_to, smtp=smtp_options)
     logging.info(f"send email result: {response}")
 
+    return response
+
 
 def generate_test_email(email_to: str) -> EmailData:
     project_name = settings.PROJECT_NAME
@@ -118,8 +120,29 @@ def verify_password_reset_token(token: str) -> str | None:
 
 def send_signature_request_email(
     email_to: str, link: str, document_title: str, message: str
-):
-    subject = "Signature Request for {document_title}"
+) -> emails.Message:
+    subject = f"Signature Request for {document_title}"
     html_content = f"""<p>You have a new signature request.</p>
-                        <p>Message: {message}</p><a href='{link}'>Sign Document</a>"""
-    send_email(email_to=email_to, subject=subject, html_content=html_content)
+                        <p>Message: {message}</p>
+                        <p>Please <a href='{link}'>click here</a> to sign the document.</p>"""
+    return send_email(email_to=email_to, subject=subject, html_content=html_content)
+
+
+def generate_secure_link(email: str, document_id: int) -> str:
+    expiration = datetime.now() + timedelta(hours=24)
+    payload = {
+        "sub": email,
+        "exp": expiration,
+        "document_id": document_id
+    }
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+    secure_link = f"{settings.FRONTEND_URL}/signe/sign_document?token={token}"
+    return secure_link
+
+
+def verify_secure_link(token: str) -> str | None:
+    try:
+        decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        return str(decoded_token["sub"])
+    except JWTError:
+        return None

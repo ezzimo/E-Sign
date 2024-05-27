@@ -14,14 +14,15 @@ from app.crud.signature_request_crud import (
     get_signature_requests_by_document,
     update_signature_request,
 )
-from app.models.models import User
+from app.crud import document_crud
+from app.models.models import User, DocumentStatus
 from app.schemas.schemas import (
     SignatoryOut,
     SignatureRequestCreate,
     SignatureRequestRead,
     SignatureRequestUpdate,
 )
-from app.utils import send_signature_request_email
+from app.utils import send_signature_request_email, generate_secure_link
 
 # Create a logger for your application
 logging.basicConfig(
@@ -55,18 +56,56 @@ def initiate_signature_request(
     """
     Initiate a new signature request.
     """
+    if len(signature_request.signatories) == 0:
+        raise HTTPException(
+            status_code=400, detail="At least one signatory is required."
+        )
+
     signature_request_data = create_signature_request(
         db=db, request_data=signature_request, sender_id=current_user.id
     )
 
-    # Send an email notification to all signatories
-    for signatory in signature_request_data.signatories:
-        send_signature_request_email(
-            email_to=signatory.email,
+    email_response = None
+    if len(signature_request.signatories) == 1:
+        signatory = signature_request.signatories[0]
+        secure_link = generate_secure_link(
+            signatory.info.email, int(signature_request.documents[0])
+        )
+        email_response = send_signature_request_email(
+            email_to=signatory.info.email,
             document_title="signature request",
-            link="link_to_sign_document",
+            link=secure_link,
             message=signature_request_data.message,
         )
+    else:
+        signature_request.signatories.sort(key=lambda s: s.info.signing_order)
+        first_signatory = signature_request.signatories[0]
+        secure_link = generate_secure_link(
+            first_signatory.info.email, int(signature_request.documents[0])
+        )
+        email_response = send_signature_request_email(
+            email_to=first_signatory.info.email,
+            document_title="signature request",
+            link=secure_link,
+            message=signature_request_data.message,
+        )
+
+    if email_response and email_response.status_code == 250:
+        # Email sent successfully, update document status
+        document_id = int(signature_request.documents[0])
+        document = document_crud.get_document_by_id(db, document_id)
+        if document:
+            document.status = DocumentStatus.SENT_FOR_SIGNATURE
+            db.add(document)
+            db.commit()
+            db.refresh(document)
+    else:
+        # Email sending failed, raise an error
+        error_message = f"""
+            Failed to send email:{email_response.status_text if email_response else 'No response'}
+        """
+        logging.error(error_message)
+        raise HTTPException(status_code=500, detail=error_message)
 
     return signature_request_data
 
