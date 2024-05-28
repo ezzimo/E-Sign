@@ -190,6 +190,9 @@ class SignatureRequest(BaseModel, table=True):
         link_model=RequestSignatoryLink
     )
     audit_logs: List["AuditLog"] = Relationship(back_populates="signature_request")
+    reminder_settings: Optional[ReminderSettings] = Relationship(
+        back_populates="request"
+    )
 
 
 class AuditLogAction(str, Enum):

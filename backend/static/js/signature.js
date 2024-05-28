@@ -1,4 +1,4 @@
-function initializeSignaturePage(email) {
+function initializeSignaturePage(email, signatureRequestId) {
     const documentLinks = document.querySelectorAll('.document-link');
     const pdfFrame = document.getElementById('pdf-frame');
     const nextDocButton = document.getElementById('next-doc');
@@ -54,7 +54,8 @@ function initializeSignaturePage(email) {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            'email': emailInput.value
+            'email': emailInput.value,
+            'signature_request_id': signatureRequestId
           })
         }).then(response => {
           if (response.ok) {
@@ -76,7 +77,8 @@ function initializeSignaturePage(email) {
           },
           body: new URLSearchParams({
             'email': emailInput.value,
-            'otp': otpInput.value
+            'otp': otpInput.value,
+            'signature_request_id': signatureRequestId
           })
         }).then(response => {
           if (response.ok) {
@@ -99,4 +101,3 @@ function initializeSignaturePage(email) {
       $('#otpModal').modal('show');
     });
   }
-  

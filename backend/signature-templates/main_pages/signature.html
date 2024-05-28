@@ -40,6 +40,7 @@
             <div class="mb-3">
               <label for="otp-email-input" class="form-label">Email</label>
               <input type="email" class="form-control" id="otp-email-input" value="{{ email }}" required>
+              <input type="hidden" id="signature-request-id" value="{{ signature_request_id }}">
             </div>
             <button type="button" class="btn btn-primary" id="send-otp-btn">Send OTP</button>
             <div class="mb-3">
@@ -60,7 +61,8 @@
 <script>
   document.addEventListener('DOMContentLoaded', (event) => {
     const email = "{{ email }}";
-    initializeSignaturePage(email);
+    const signatureRequestId = "{{ signature_request_id }}";
+    initializeSignaturePage(email, signatureRequestId);
   });
 </script>
 {% endblock %}

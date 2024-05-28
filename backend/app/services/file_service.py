@@ -8,7 +8,7 @@ from jose import JWTError, jwt
 from fastapi import UploadFile, HTTPException
 from app.core.config import settings
 from app.utils import send_email
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List
 
 
@@ -39,6 +39,10 @@ def file_existence(file_path: str) -> bool:
 def verify_secure_link_token(token: str) -> Optional[dict]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        expiration = payload.get("exp")
+        if expiration and datetime.fromtimestamp(expiration) < datetime.now():
+            logger.error("Token has expired")
+            return None
         logger.info(f"the decoded token is:  {payload}")
         return payload
     except JWTError:
@@ -57,9 +61,16 @@ def send_otp_code(email: str, otp: int) -> bool:
     return response.status_code == 250
 
 
-def generate_secure_link(email: str, document_ids: List[int], signatory_id: int) -> str:
-    expiration = datetime.now() + timedelta(hours=24)
+def generate_secure_link(
+    expiry_date: datetime,
+    signature_request_id: int,
+    email: str,
+    document_ids: List[int],
+    signatory_id: int
+) -> str:
+    expiration = expiry_date
     payload = {
+        "signature_request_id": signature_request_id,
         "sub": email,
         "exp": expiration,
         "document_ids": document_ids,
@@ -68,11 +79,3 @@ def generate_secure_link(email: str, document_ids: List[int], signatory_id: int)
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
     secure_link = f"{settings.FRONTEND_URL}/api/v1/signe/sign_document?token={token}"
     return secure_link
-
-
-def verify_secure_link(token: str) -> str | None:
-    try:
-        decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-        return str(decoded_token["sub"])
-    except JWTError:
-        return None

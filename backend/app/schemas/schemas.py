@@ -7,6 +7,7 @@ from ..models.models import ( # noqa
     AuditLogAction,
     DocumentStatus,
     FieldType,
+    SignatureRequestStatus,
 )
 
 
@@ -15,6 +16,9 @@ class UserBaseSchema(BaseModel):
     email: EmailStr = Field(..., description="User email address")
     is_active: bool = Field(default=True, description="Is user active?")
     is_superuser: bool = Field(default=False, description="Is user a superuser?")
+
+    class Config:
+        from_attributes = True
 
 
 # Schema for creating a new user
@@ -28,6 +32,9 @@ class UserCreate(UserBaseSchema):
     def validate_password_strength(cls, value):
         # Implement password strength validation logic if needed
         return value
+
+    class Config:
+        from_attributes = True
 
 
 # Schema for updating an existing user
@@ -250,31 +257,55 @@ class ReminderSettingsSchema(BaseModel):
     max_occurrences: int
     timezone: str | None = None
 
+    class Config:
+        from_attributes = True
+
 
 class SignatureRequestBase(BaseModel):
     name: str
     delivery_mode: str
     ordered_signers: bool
-    reminder_settings: ReminderSettingsSchema | None = None
-    expiration_date: datetime | None = None
-    message: str | None = None
-    expiry_date: datetime | None = None
+    reminder_settings: Optional[ReminderSettingsSchema] = None
+    expiry_date: Optional[datetime] = None
+    message: Optional[str] = None
+
+    class Config:
+        from_attributes = True
 
 
 class SignatureRequestCreate(SignatureRequestBase):
     signatories: List["SignatoryData"]
     documents: List[int]
 
+    class Config:
+        from_attributes = True
+
 
 class SignatureRequestRead(SignatureRequestBase):
     id: int
+    status: SignatureRequestStatus
     sender_id: int
     created_at: datetime
     updated_at: datetime
+    documents: List[int]
+    signatories: List[int]
+
+    class Config:
+        from_attributes = True
 
 
 class SignatureRequestUpdate(BaseModel):
-    pass
+    name: Optional[str] = None
+    delivery_mode: Optional[str] = None
+    ordered_signers: Optional[bool] = None
+    reminder_settings: Optional[ReminderSettingsSchema] = None
+    expiry_date: Optional[datetime] = None
+    message: Optional[str] = None
+    signatories: Optional[List["SignatoryData"]] = None
+    documents: Optional[List[int]] = None
+
+    class Config:
+        from_attributes = True
 
 
 class SignatoryData(BaseModel):
@@ -286,9 +317,13 @@ class SignatoryData(BaseModel):
 
 
 class AuditLogBase(BaseModel):
-    document_id: int | None
-    user_id: int | None
+    description: Optional[str]
+    ip_address: Optional[str]
     action: AuditLogAction
+    signature_request_id: Optional[int]
+
+    class Config:
+        from_attributes = True
 
 
 class AuditLogCreate(AuditLogBase):
