@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
 from app.api.deps import SessionDep
-from app.models.models import Document, Signatory
+from app.models.models import Document, DocumentStatus, Signatory
 from app.services.file_service import (
     verify_secure_link_token,
     send_otp_code,
@@ -54,6 +54,13 @@ def access_document_with_token(*, session: SessionDep, token: str = Query(...), 
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="File not found")
         document_urls.append(f"document_files/{document.owner_id}_{document.file}")
+
+        # Update the document status to VIEWED
+        if document.status != DocumentStatus.VIEWED:
+            document.status = DocumentStatus.VIEWED
+            session.add(document)
+            session.commit()
+            session.refresh(document)
 
     signatory_statement = select(Signatory).where(Signatory.id == int(signatory_id))
     signatory = session.exec(signatory_statement).first()

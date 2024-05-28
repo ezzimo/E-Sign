@@ -38,10 +38,15 @@
         <div class="modal-body">
           <form id="otp-form">
             <div class="mb-3">
-              <label for="otp-input" class="form-label">OTP</label>
-              <input type="text" class="form-control" id="otp-input" required>
+              <label for="otp-email-input" class="form-label">Email</label>
+              <input type="email" class="form-control" id="otp-email-input" value="{{ email }}" required>
             </div>
-            <button type="submit" class="btn btn-primary">Verify</button>
+            <button type="button" class="btn btn-primary" id="send-otp-btn">Send OTP</button>
+            <div class="mb-3">
+              <label for="otp-input" class="form-label">OTP</label>
+              <input type="text" class="form-control" id="otp-input" disabled required>
+            </div>
+            <button type="submit" class="btn btn-primary" disabled id="verify-otp-btn">Verify</button>
           </form>
         </div>
       </div>
@@ -50,6 +55,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="{{ url_for('static', path='js/signature.js') }}"></script>
 <script>
   document.addEventListener('DOMContentLoaded', (event) => {

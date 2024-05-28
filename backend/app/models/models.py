@@ -38,6 +38,7 @@ class User(UserBase, table=True):
 class DocumentStatus(enum.Enum):
     DRAFT = "draft"
     SENT_FOR_SIGNATURE = "sent for signature"
+    VIEWED = "viewed"
     SIGNED = "signed"
     REJECTED = "rejected"
 

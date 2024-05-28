@@ -66,7 +66,7 @@ def generate_secure_link(email: str, document_ids: List[int], signatory_id: int)
         "signatory_id": signatory_id,
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
-    secure_link = f"{settings.FRONTEND_URL}/sign_document?token={token}"
+    secure_link = f"{settings.FRONTEND_URL}/api/v1/signe/sign_document?token={token}"
     return secure_link
 
 
