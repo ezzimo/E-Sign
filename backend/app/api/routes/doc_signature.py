@@ -21,6 +21,9 @@ from app.models.models import (
 from app.services.file_service import (
     verify_secure_link_token,
     send_otp_code,
+    apply_pdf_security,
+    generate_pdf_hash,
+    add_fields_to_pdf,
 )
 from app.crud import audit_log_crud
 from app.schemas.schemas import AuditLogCreate
@@ -29,9 +32,7 @@ templates = Jinja2Templates(directory="signature-templates")
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# In-memory store for OTPs
 otp_store = {}
-# Define the base directory for the static files
 STATIC_FILES_DIR = Path("/app/static/document_files")
 
 
@@ -70,14 +71,12 @@ def access_document_with_token(
             raise HTTPException(status_code=404, detail="File not found")
         document_urls.append(f"document_files/{document.owner_id}_{document.file}")
 
-        # Update the document status to VIEWED
         if document.status != DocumentStatus.VIEWED:
             document.status = DocumentStatus.VIEWED
             session.add(document)
             session.commit()
             session.refresh(document)
 
-        # Create an audit log for viewing the document
         audit_log_crud.create_audit_log(
             session,
             AuditLogCreate(
@@ -115,7 +114,6 @@ def send_otp(
     if not send_otp_code(email, otp):
         raise HTTPException(status_code=500, detail="Failed to send OTP")
 
-    # Create an audit log for sending OTP
     audit_log_crud.create_audit_log(
         session,
         AuditLogCreate(
@@ -148,7 +146,6 @@ def verify_otp(
         raise HTTPException(status_code=400, detail="Invalid OTP")
     del otp_store[email]
 
-    # Create an audit log for verifying OTP
     audit_log_crud.create_audit_log(
         session,
         AuditLogCreate(
@@ -160,7 +157,6 @@ def verify_otp(
         ),
     )
 
-    # Update the signature request status to COMPLETED
     signature_request = session.get(SignatureRequest, signature_request_id)
     if not signature_request:
         raise HTTPException(status_code=404, detail="Signature request not found")
@@ -170,6 +166,13 @@ def verify_otp(
     session.commit()
     session.refresh(signature_request)
 
-    # Perform signing logic here (if any)
+    for document in signature_request.documents:
+        file_path = STATIC_FILES_DIR / f"{document.owner_id}_{document.file}"
+
+        add_fields_to_pdf(str(file_path), signature_request.signatories[0].fields)
+        apply_pdf_security(str(file_path))
+        pdf_hash = generate_pdf_hash(str(file_path))
+
+        logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
 
     return JSONResponse(content={"message": "OTP verified and signature request completed successfully"})

@@ -5,14 +5,14 @@ function initializeSignaturePage(email, signatureRequestId) {
     const signButton = document.getElementById('sign-btn');
     let currentDocIndex = 0;
     let viewedDocs = new Set();
-  
+
     documentLinks.forEach((link, index) => {
       link.addEventListener('click', (event) => {
         event.preventDefault();
         pdfFrame.src = link.dataset.url;
         currentDocIndex = index;
         viewedDocs.add(index);
-  
+
         if (index === documentLinks.length - 1) {
           nextDocButton.disabled = true;
           if (viewedDocs.size === documentLinks.length) {
@@ -24,13 +24,13 @@ function initializeSignaturePage(email, signatureRequestId) {
         }
       });
     });
-  
+
     nextDocButton.addEventListener('click', () => {
       if (currentDocIndex < documentLinks.length - 1) {
         currentDocIndex++;
         pdfFrame.src = documentLinks[currentDocIndex].dataset.url;
         viewedDocs.add(currentDocIndex);
-  
+
         if (currentDocIndex === documentLinks.length - 1) {
           nextDocButton.disabled = true;
           if (viewedDocs.size === documentLinks.length) {
@@ -39,14 +39,14 @@ function initializeSignaturePage(email, signatureRequestId) {
         }
       }
     });
-  
+
     signButton.addEventListener('click', () => {
       const emailInput = document.getElementById('otp-email-input');
       emailInput.value = email;
       const otpInput = document.getElementById('otp-input');
       const sendOtpBtn = document.getElementById('send-otp-btn');
       const verifyOtpBtn = document.getElementById('verify-otp-btn');
-  
+
       sendOtpBtn.addEventListener('click', () => {
         fetch('/api/v1/signe/send_otp', {
           method: 'POST',
@@ -67,7 +67,7 @@ function initializeSignaturePage(email, signatureRequestId) {
           }
         });
       });
-  
+
       document.getElementById('otp-form').addEventListener('submit', (event) => {
         event.preventDefault();
         fetch('/api/v1/signe/verify_otp', {
@@ -97,7 +97,7 @@ function initializeSignaturePage(email, signatureRequestId) {
           }
         });
       });
-  
+
       $('#otpModal').modal('show');
     });
-  }
+}

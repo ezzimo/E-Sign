@@ -71,11 +71,10 @@ def create_signature_request(
                 optional=field_data.optional,
                 mention=field_data.mention,
                 text=field_data.text,
-                # Only include coordinates if valid
-                x=field_data.x if field_data.x else None,
-                y=field_data.y if field_data.y else None,
-                height=field_data.height if field_data.height else None,
-                width=field_data.width if field_data.width else None,
+                x=field_data.x,
+                y=field_data.y,
+                height=field_data.height,
+                width=field_data.width,
             )
 
             db.add(new_field)
