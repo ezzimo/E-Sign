@@ -5,6 +5,7 @@ import PyPDF2
 import random
 import string
 import hashlib
+from app.models.models import FieldType
 from pathlib import Path
 from typing import Optional, List
 from jose import JWTError, jwt
@@ -14,11 +15,16 @@ from app.utils import send_email
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.pdfmetrics import registerFont
+from reportlab.lib.colors import black
+
+# Register a handwriting-like font
+registerFont(TTFont("Handwriting", "static/fonts/Allura-Regular.ttf"))
 
 logger = logging.getLogger(__name__)
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-UPLOAD_DIR = BASE_DIR / "static" / "document_files"
+UPLOAD_DIR = Path("/app/static/document_files")
 
 
 def save_file(file: UploadFile, user_id: int) -> str:
@@ -85,7 +91,7 @@ def generate_secure_link(
 
 def apply_pdf_security(pdf_path: str):
     """
-    Apply security settings to a PDF to prevent editing, copying, and printing.
+    Apply security settings to a PDF to allow only printing and printing in high resolution.
     """
     reader = PyPDF2.PdfReader(pdf_path)
     writer = PyPDF2.PdfWriter()
@@ -93,19 +99,41 @@ def apply_pdf_security(pdf_path: str):
     for page in reader.pages:
         writer.add_page(page)
 
+    # Combine permissions for printing and high-resolution printing
+    permissions_flag = (
+        0b0100 | 0b0001_0000_0000_0000  # Printing  # Printing in High Resolution
+    )
+
     writer.encrypt(
-        user_pwd="4SG{_dJe9°B+GW&NYE4",
-        owner_pwd=settings.SECRET_KEY,
+        user_password="",
+        owner_password=settings.SECRET_KEY,
         use_128bit=True,
-        permissions={PyPDF2.Permissions.PRINT, PyPDF2.Permissions.ANNOTATE},
+        permissions_flag=permissions_flag,
     )
 
     with open(pdf_path, "wb") as f:
         writer.write(f)
 
 
-def draw_signature_field(c, field):
-    c.drawString(field.x, field.y, "Sign here:")
+def draw_signature_field(c, field, signatory):
+    logger.info(
+        f"""
+        Drawing signature field for signatory:
+        {signatory.first_name} {signatory.last_name} at ({field.x}, {field.y})
+        with dimensions ({field.width}, {field.height})
+        """
+    )
+    if signatory.signature_image:
+        logger.info(f"Using signature image at {signatory.signature_image}")
+        c.drawImage(
+            signatory.signature_image, field.x, field.y, field.width, field.height
+        )
+    else:
+        logger.info("Using handwritten font for signature")
+        c.setFont("Handwriting", 24)
+        c.setFillColor(black)
+        c.drawString(field.x, field.y,
+                     f"{signatory.first_name} {signatory.last_name}")
     c.rect(field.x, field.y - 10, field.width, field.height)
 
 
@@ -135,27 +163,29 @@ def draw_radio_group_field(c, field):
             c.circle(radio.x, radio.y, radio.size / 4, fill=1)
 
 
-def draw_doc_field(c, field):
-    if field.type == "signature":
-        draw_signature_field(c, field)
-    elif field.type == "text":
+def draw_doc_field(c, field, signatory):
+    logger.info(f"Drawing field type: {field.type}")
+    if field.type == FieldType.SIGNATURE:
+        draw_signature_field(c, field, signatory)
+    elif field.type == FieldType.TEXT:
         draw_text_field(c, field)
-    elif field.type == "mention":
+    elif field.type == FieldType.MENTION:
         draw_mention_field(c, field)
-    elif field.type == "read_only_text":
+    elif field.type == FieldType.READ_ONLY_TEXT:
         draw_read_only_text_field(c, field)
-    elif field.type == "checkbox":
+    elif field.type == FieldType.CHECKBOX:
         draw_checkbox_field(c, field)
-    elif field.type == "radio_group":
+    elif field.type == FieldType.RADIO_GROUP:
         draw_radio_group_field(c, field)
 
 
-def add_fields_to_pdf(file_path, fields):
+def add_fields_to_pdf(file_path, fields, signatory):
+    logger.info(f"Adding fields to PDF: {file_path}")
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=letter)
     can.setFont("Helvetica", 12)
     for field in fields:
-        draw_doc_field(can, field)
+        draw_doc_field(can, field, signatory)
     can.save()
 
     packet.seek(0)
@@ -165,10 +195,12 @@ def add_fields_to_pdf(file_path, fields):
 
     for i in range(len(existing_pdf.pages)):
         page = existing_pdf.pages[i]
-        if i == 0:  # Assuming fields only on the first page
+        if i == field.page - 1:
+            logger.info(f"Merging new content to page {i}")
             page.merge_page(new_pdf.pages[0])
         output.add_page(page)
 
+    logger.info(f"Writing updated PDF to {file_path}")
     with open(file_path, "wb") as outputStream:
         output.write(outputStream)
 

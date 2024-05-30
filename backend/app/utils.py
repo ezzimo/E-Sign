@@ -126,3 +126,43 @@ def send_signature_request_email(
                         <p>Message: {message}</p>
                         <p>Please <a href='{link}'>click here</a> to sign the document.</p>"""
     return send_email(email_to=email_to, subject=subject, html_content=html_content)
+
+
+def send_signature_request_notification_email(
+    email_to: str, signature_request_name: str, signature_request_id: str, status: str
+) -> emails.Message:
+    subject = f"""Signature Request Status Update for '{signature_request_name}' \
+                  whith id: '{signature_request_id}' \
+                  """
+
+    # Mapping status to user-friendly messages
+    status_messages = {
+        "draft": "The document is still in draft mode and hasn't been sent.",
+        "sent": "The document has been sent out for signatures.",
+        "completed": "All required parties have signed the document, and the process is now completed.",
+        "expired": "The signature request has expired without being completed.",
+        "canceled": "The signature request has been canceled."
+    }
+
+    # Generate a more detailed message based on the status
+    detailed_message = status_messages.get(status, "There has been an update to your document.")
+
+    # HTML content enhanced for better readability and formatting
+    html_content = f"""
+    <html>
+        <head></head>
+        <body>
+            <p>Hello,</p>
+            <p>This is a notification regarding the signature request for the document
+            titled <strong>'{signature_request_name}'</strong>.</p>
+            <p><strong>Status:</strong> {status.capitalize()}</p>
+            <p><strong>Details:</strong> {detailed_message}</p>
+            <p>
+            If you have any questions or require further assistance, please do not hesitate to contact us.
+            </p>
+            <p>Thank you for using our services!</p>
+        </body>
+    </html>
+    """
+
+    return send_email(email_to=email_to, subject=subject, html_content=html_content)

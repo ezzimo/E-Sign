@@ -29,7 +29,7 @@ from app.schemas.schemas import (
     SignatureRequestUpdate,
     AuditLogCreate,
 )
-from app.utils import send_signature_request_email
+from app.utils import send_signature_request_email, send_signature_request_notification_email
 from app.services.file_service import generate_secure_link
 
 # Create a logger for your application
@@ -133,6 +133,14 @@ def initiate_signature_request(
                 action=AuditLogAction.SIGNATURE_REQUESTED,
                 signature_request_id=signature_request_data.id,
             ),
+        )
+
+        # Send notification email
+        send_signature_request_notification_email(
+            signature_request_data.sender.email,
+            signature_request_data.name,
+            signature_request_data.id,
+            signature_request_data.status.value
         )
     else:
         # Email sending failed, raise an error

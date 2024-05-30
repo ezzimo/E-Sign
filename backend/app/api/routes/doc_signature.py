@@ -25,6 +25,7 @@ from app.services.file_service import (
     generate_pdf_hash,
     add_fields_to_pdf,
 )
+from app.utils import send_signature_request_notification_email
 from app.crud import audit_log_crud
 from app.schemas.schemas import AuditLogCreate
 
@@ -85,6 +86,18 @@ def access_document_with_token(
                 action=AuditLogAction.DOCUMENT_VIEWED,
                 signature_request_id=signature_request_id,
             ),
+        )
+
+        signature_request_statement = select(SignatureRequest).where(
+            SignatureRequest.id == int(signature_request_id)
+        )
+        signature_request = session.exec(signature_request_statement).first()
+        # Send notification email
+        send_signature_request_notification_email(
+            signature_request.sender.email,
+            signature_request.name,
+            signature_request.id,
+            signature_request.status.value
         )
 
     signatory_statement = select(Signatory).where(Signatory.id == int(signatory_id))
@@ -165,11 +178,20 @@ def verify_otp(
     session.add(signature_request)
     session.commit()
     session.refresh(signature_request)
+    # Send notification email
+    send_signature_request_notification_email(
+        signature_request.sender.email,
+        signature_request.name,
+        signature_request.id,
+        signature_request.status.value
+    )
 
     for document in signature_request.documents:
         file_path = STATIC_FILES_DIR / f"{document.owner_id}_{document.file}"
 
-        add_fields_to_pdf(str(file_path), signature_request.signatories[0].fields)
+        for signatory in signature_request.signatories:
+            logger.info(f"the signatory is: {signatory.first_name}")
+            add_fields_to_pdf(str(file_path), signatory.fields, signatory)
         apply_pdf_security(str(file_path))
         pdf_hash = generate_pdf_hash(str(file_path))
 
