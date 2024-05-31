@@ -140,7 +140,7 @@ def initiate_signature_request(
             signature_request_data.sender.email,
             signature_request_data.name,
             signature_request_data.id,
-            signature_request_data.status.value
+            signature_request_data.status.value,
         )
     else:
         # Email sending failed, raise an error

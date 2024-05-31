@@ -6,6 +6,7 @@ from ..models.models import ( # noqa
     UserBase,
     AuditLogAction,
     DocumentStatus,
+    DocumentSignatureDetails,
     FieldType,
     SignatureRequestStatus,
 )
@@ -125,6 +126,23 @@ class DocumentUpdate(BaseModel):
         from_attributes = True
 
 
+class DocumentSignatureDetailsBase(BaseModel):
+    document_id: int = Field(..., description="The document's unique identifier")
+    signed_hash: str = Field(..., description="SHA-256 hash of the signed document")
+    timestamp: datetime = Field(..., description="The time when the document was signed")
+    certified_timestamp: Optional[str] = Field(None, description="Certified timestamp if available")
+    ip_address: Optional[str] = Field(None, description="IP address of the signer")
+
+
+class DocumentSignatureDetailsCreate(DocumentSignatureDetailsBase):
+    pass
+
+
+class DocumentSignatureDetailsOut(DocumentSignatureDetailsBase):
+    id: int
+    document_id: int
+
+
 class DocumentOut(DocumentBase):
     id: int = Field(..., description="Unique identifier for the document")
     created_at: datetime = Field(
@@ -134,6 +152,7 @@ class DocumentOut(DocumentBase):
         ..., description="Timestamp when the document was last updated"
     )
     owner: UserOut = Field(..., description="User information of the owner")
+    signature_details: Optional[DocumentSignatureDetailsOut] = None
 
     @validator('file_url')
     def validate_file_url(cls, value):

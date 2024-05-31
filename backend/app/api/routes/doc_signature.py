@@ -26,8 +26,8 @@ from app.services.file_service import (
     add_fields_to_pdf,
 )
 from app.utils import send_signature_request_notification_email
-from app.crud import audit_log_crud
-from app.schemas.schemas import AuditLogCreate
+from app.crud import audit_log_crud, signed_document_crud
+from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate
 
 templates = Jinja2Templates(directory="signature-templates")
 logger = logging.getLogger(__name__)
@@ -56,7 +56,9 @@ def access_document_with_token(
     if signatory_id is None:
         raise HTTPException(status_code=400, detail="No signatory id in the payload")
     if signature_request_id is None:
-        raise HTTPException(status_code=400, detail="No signature_request id in the payload")
+        raise HTTPException(
+            status_code=400, detail="No signature_request id in the payload"
+        )
 
     document_urls = []
     for document_id in document_ids:
@@ -97,7 +99,7 @@ def access_document_with_token(
             signature_request.sender.email,
             signature_request.name,
             signature_request.id,
-            signature_request.status.value
+            signature_request.status.value,
         )
 
     signatory_statement = select(Signatory).where(Signatory.id == int(signatory_id))
@@ -119,7 +121,10 @@ def access_document_with_token(
 
 @router.post("/send_otp", response_class=JSONResponse)
 def send_otp(
-    request: Request, session: SessionDep, email: str = Form(...), signature_request_id: int = Form(...)
+    request: Request,
+    session: SessionDep,
+    email: str = Form(...),
+    signature_request_id: int = Form(...),
 ):
     otp = random.randint(100000, 999999)
     expiry_time = datetime.now() + timedelta(minutes=30)
@@ -147,7 +152,7 @@ def verify_otp(
     session: SessionDep,
     email: str = Form(...),
     otp: int = Form(...),
-    signature_request_id: int = Form(...)
+    signature_request_id: int = Form(...),
 ):
     if email not in otp_store:
         raise HTTPException(status_code=400, detail="OTP not found")
@@ -166,7 +171,6 @@ def verify_otp(
             ip_address=request.client.host,
             action=AuditLogAction.DOCUMENT_SIGNED,
             signature_request_id=signature_request_id,
-            document_id=None,
         ),
     )
 
@@ -178,23 +182,51 @@ def verify_otp(
     session.add(signature_request)
     session.commit()
     session.refresh(signature_request)
-    # Send notification email
-    send_signature_request_notification_email(
-        signature_request.sender.email,
-        signature_request.name,
-        signature_request.id,
-        signature_request.status.value
-    )
 
     for document in signature_request.documents:
         file_path = STATIC_FILES_DIR / f"{document.owner_id}_{document.file}"
 
         for signatory in signature_request.signatories:
-            logger.info(f"the signatory is: {signatory.first_name}")
-            add_fields_to_pdf(str(file_path), signatory.fields, signatory)
-        apply_pdf_security(str(file_path))
-        pdf_hash = generate_pdf_hash(str(file_path))
+            for field in signatory.fields:
+                if field.document_id == document.id:
+                    add_fields_to_pdf(str(file_path), field, signatory)
+                    apply_pdf_security(str(file_path))
+                    pdf_hash = generate_pdf_hash(str(file_path))
+                    logger.info(
+                        f"Generated hash for document {document.id}: {pdf_hash}"
+                    )
 
-        logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
+                    # Storing the hash and other details
+                    document_signature_details = DocumentSignatureDetailsCreate(
+                        document_id=document.id,
+                        signed_hash=pdf_hash,
+                        timestamp=datetime.now(),
+                        ip_address=request.client.host,
+                    )
+                    signed_document_crud.create_document_signature_details(
+                        session,
+                        document_signature_details,
+                    )
 
-    return JSONResponse(content={"message": "OTP verified and signature request completed successfully"})
+    session.commit()
+    # Send notification email
+    signed_documents = [
+        STATIC_FILES_DIR / "signed_documents" / f"{document.owner_id}_{document.file}"
+        for document in signature_request.documents
+    ]
+    # Send email to the owner and all signatories
+    recipients = [signature_request.sender.email] + [
+        signatory.email for signatory in signature_request.signatories
+    ]
+    for recipient in recipients:
+        send_signature_request_notification_email(
+            email_to=recipient,
+            signature_request_name=signature_request.name,
+            signature_request_id=signature_request.id,
+            status=signature_request.status.value,
+            documents=signed_documents,
+        )
+
+    return JSONResponse(
+        content={"message": "OTP verified and signature request completed successfully"}
+    )

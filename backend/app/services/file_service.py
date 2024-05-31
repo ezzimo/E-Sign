@@ -179,19 +179,26 @@ def draw_doc_field(c, field, signatory):
         draw_radio_group_field(c, field)
 
 
-def add_fields_to_pdf(file_path, fields, signatory):
+def add_fields_to_pdf(file_path, field, signatory):
     logger.info(f"Adding fields to PDF: {file_path}")
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=letter)
     can.setFont("Helvetica", 12)
-    for field in fields:
-        draw_doc_field(can, field, signatory)
+
+    draw_doc_field(can, field, signatory)
     can.save()
 
     packet.seek(0)
     new_pdf = PyPDF2.PdfReader(packet)
     existing_pdf = PyPDF2.PdfReader(open(file_path, "rb"))
     output = PyPDF2.PdfWriter()
+
+    # Define new folder path
+    new_folder_path = UPLOAD_DIR / "signed_documents"
+    new_folder_path.mkdir(exist_ok=True)  # Make sure the directory exists
+
+    # Create new file path in the signed_documents folder
+    new_file_path = new_folder_path / Path(file_path).name
 
     for i in range(len(existing_pdf.pages)):
         page = existing_pdf.pages[i]
@@ -200,8 +207,8 @@ def add_fields_to_pdf(file_path, fields, signatory):
             page.merge_page(new_pdf.pages[0])
         output.add_page(page)
 
-    logger.info(f"Writing updated PDF to {file_path}")
-    with open(file_path, "wb") as outputStream:
+    logger.info(f"Writing updated PDF to {new_file_path}")
+    with open(new_file_path, "wb") as outputStream:
         output.write(outputStream)
 
 

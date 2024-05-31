@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional, Tuple
 
 import emails  # type: ignore
 from jinja2 import Template
@@ -30,6 +30,7 @@ def send_email(
     email_to: str,
     subject: str = "",
     html_content: str = "",
+    attachments: Optional[List[Tuple[str, str, str]]] = None  # New parameter for attachments
 ) -> None:
     assert settings.emails_enabled, "no provided configuration for email variables"
     message = emails.Message(
@@ -37,6 +38,17 @@ def send_email(
         html=html_content,
         mail_from=(settings.EMAILS_FROM_NAME, settings.EMAILS_FROM_EMAIL),
     )
+
+    # Handle attachments
+    if attachments:
+        for filename, content, mimetype in attachments:
+            message.attach(
+                data=content,
+                filename=filename,
+                maintype=mimetype.split('/')[0],
+                subtype=mimetype.split('/')[1],
+            )
+
     smtp_options = {"host": settings.SMTP_HOST, "port": settings.SMTP_PORT}
     if settings.SMTP_TLS:
         smtp_options["tls"] = True
@@ -48,8 +60,6 @@ def send_email(
         smtp_options["password"] = settings.SMTP_PASSWORD
     response = message.send(to=email_to, smtp=smtp_options)
     logging.info(f"send email result: {response}")
-
-    return response
 
 
 def generate_test_email(email_to: str) -> EmailData:
@@ -129,12 +139,18 @@ def send_signature_request_email(
 
 
 def send_signature_request_notification_email(
-    email_to: str, signature_request_name: str, signature_request_id: str, status: str
+    email_to: str, signature_request_name: str, signature_request_id: str, status: str,
+    documents: Optional[List[Path]] = None
 ) -> emails.Message:
     subject = f"""Signature Request Status Update for '{signature_request_name}' \
                   whith id: '{signature_request_id}' \
                   """
 
+    # Prepare email attachments
+    attachments = []
+    for document_path in documents:
+        with open(document_path, 'rb') as f:
+            attachments.append((document_path.name, f.read(), 'application/pdf'))
     # Mapping status to user-friendly messages
     status_messages = {
         "draft": "The document is still in draft mode and hasn't been sent.",
@@ -165,4 +181,4 @@ def send_signature_request_notification_email(
     </html>
     """
 
-    return send_email(email_to=email_to, subject=subject, html_content=html_content)
+    return send_email(email_to=email_to, subject=subject, html_content=html_content, attachments=attachments)
