@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_db
@@ -14,14 +14,23 @@ from app.crud.signature_request_crud import (
     get_signature_requests_by_document,
     update_signature_request,
 )
-from app.models.models import User
+from app.crud import audit_log_crud, document_crud
+from app.models.models import (
+    User,
+    DocumentStatus,
+    AuditLogAction,
+    SignatureRequestStatus,
+)
 from app.schemas.schemas import (
+    ReminderSettingsSchema,
     SignatoryOut,
     SignatureRequestCreate,
     SignatureRequestRead,
     SignatureRequestUpdate,
+    AuditLogCreate,
 )
-from app.utils import send_signature_request_email
+from app.utils import send_signature_request_email, send_signature_request_notification_email
+from app.services.file_service import generate_secure_link
 
 # Create a logger for your application
 logging.basicConfig(
@@ -46,8 +55,11 @@ def list_signature_requests(
     return signature_requests
 
 
-@router.post("/", response_model=SignatureRequestRead, status_code=201)
+@router.post(
+    "/", response_model=SignatureRequestRead, status_code=status.HTTP_201_CREATED
+)
 def initiate_signature_request(
+    request: Request,
     signature_request: SignatureRequestCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -55,41 +67,117 @@ def initiate_signature_request(
     """
     Initiate a new signature request.
     """
+    if len(signature_request.signatories) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one signatory is required.",
+        )
+
     signature_request_data = create_signature_request(
         db=db, request_data=signature_request, sender_id=current_user.id
     )
 
-    # Send an email notification to all signatories
-    for signatory in signature_request_data.signatories:
-        send_signature_request_email(
+    email_response = None
+    if len(signature_request.signatories) == 1:
+        signatory = signature_request_data.signatories[0]
+        secure_link = generate_secure_link(
+            signature_request_data.expiry_date,
+            signature_request_data.id,
+            signatory.email,
+            [document.id for document in signature_request_data.documents],
+            signatory.id,
+        )
+        email_response = send_signature_request_email(
             email_to=signatory.email,
             document_title="signature request",
-            link="link_to_sign_document",
+            link=secure_link,
+            message=signature_request_data.message,
+        )
+    else:
+        signature_request_data.signatories.sort(key=lambda s: s.signing_order)
+        first_signatory = signature_request_data.signatories[0]
+        secure_link = generate_secure_link(
+            signature_request_data.expiry_date,
+            signature_request_data.id,
+            first_signatory.email,
+            [document.id for document in signature_request_data.documents],
+            first_signatory.id,
+        )
+        email_response = send_signature_request_email(
+            email_to=first_signatory.email,
+            document_title="signature request",
+            link=secure_link,
             message=signature_request_data.message,
         )
 
-    return signature_request_data
+    if email_response and email_response.status_code == 250:
+        # Email sent successfully, update document status
+        for document_id in signature_request.documents:
+            document = document_crud.get_document_by_id(db, document_id)
+            if document:
+                document.status = DocumentStatus.SENT_FOR_SIGNATURE
+                db.add(document)
 
+        # Update signature request status
+        signature_request_data.status = SignatureRequestStatus.SENT
+        db.add(signature_request_data)
+        db.commit()
+        db.refresh(signature_request_data)
 
-@router.post("/create", response_model=SignatureRequestRead)
-def create_request(
-    signature_request: SignatureRequestCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Create a new signature request.
-    """
-    request = create_signature_request(
-        db=db, request=signature_request, sender_id=current_user.id
+        # Create an audit log
+        audit_log_crud.create_audit_log(
+            db,
+            AuditLogCreate(
+                description="Signature request initiated",
+                ip_address=request.client.host,
+                action=AuditLogAction.SIGNATURE_REQUESTED,
+                signature_request_id=signature_request_data.id,
+            ),
+        )
+
+        # Send notification email
+        send_signature_request_notification_email(
+            signature_request_data.sender.email,
+            signature_request_data.name,
+            signature_request_data.id,
+            signature_request_data.status.value,
+        )
+    else:
+        # Email sending failed, raise an error
+        error_message = f"""
+            Failed to send email: {email_response.status_text if email_response else 'No response'}
+        """
+        logging.error(error_message)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
+        )
+
+    # Extracting IDs for documents and signatories
+    document_ids = [document.id for document in signature_request_data.documents]
+    signatory_ids = [signatory.id for signatory in signature_request_data.signatories]
+
+    # Create a response object with the appropriate structure
+    response_data = SignatureRequestRead(
+        id=signature_request_data.id,
+        sender_id=signature_request_data.sender_id,
+        created_at=signature_request_data.created_at,
+        updated_at=signature_request_data.updated_at,
+        status=signature_request_data.status,
+        name=signature_request_data.name,
+        delivery_mode=signature_request_data.delivery_mode,
+        ordered_signers=signature_request_data.ordered_signers,
+        reminder_settings=(
+            ReminderSettingsSchema.model_validate(signature_request_data.reminder_settings)
+            if signature_request_data.reminder_settings
+            else None
+        ),
+        expiry_date=signature_request_data.expiry_date,
+        message=signature_request_data.message,
+        documents=document_ids,
+        signatories=signatory_ids,
     )
-    signatory_email = db.get(User, request.signatory_id).email
-    send_signature_request_email(
-        email_to=signatory_email,
-        link="link_to_sign_document",
-        message=request.message,
-    )
-    return request
+
+    return response_data
 
 
 @router.get("/{request_id}", response_model=SignatureRequestRead)

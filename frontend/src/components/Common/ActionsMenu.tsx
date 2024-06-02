@@ -113,14 +113,6 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
                         onClose={editModal.onClose}
                     />
                 );
-                case "Document":
-                    return (
-                        <EditDocument
-                            document={value as DocumentRead}
-                            isOpen={editModal.isOpen}
-                            onClose={editModal.onClose}
-                        />
-                    );
             default:
                 return null;
         }

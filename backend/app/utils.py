@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional, Tuple
 
 import emails  # type: ignore
 from jinja2 import Template
@@ -30,6 +30,7 @@ def send_email(
     email_to: str,
     subject: str = "",
     html_content: str = "",
+    attachments: Optional[List[Tuple[str, str, str]]] = None  # New parameter for attachments
 ) -> None:
     assert settings.emails_enabled, "no provided configuration for email variables"
     message = emails.Message(
@@ -37,6 +38,17 @@ def send_email(
         html=html_content,
         mail_from=(settings.EMAILS_FROM_NAME, settings.EMAILS_FROM_EMAIL),
     )
+
+    # Handle attachments
+    if attachments:
+        for filename, content, mimetype in attachments:
+            message.attach(
+                data=content,
+                filename=filename,
+                maintype=mimetype.split('/')[0],
+                subtype=mimetype.split('/')[1],
+            )
+
     smtp_options = {"host": settings.SMTP_HOST, "port": settings.SMTP_PORT}
     if settings.SMTP_TLS:
         smtp_options["tls"] = True
@@ -118,8 +130,55 @@ def verify_password_reset_token(token: str) -> str | None:
 
 def send_signature_request_email(
     email_to: str, link: str, document_title: str, message: str
-):
-    subject = "Signature Request for {document_title}"
+) -> emails.Message:
+    subject = f"Signature Request for {document_title}"
     html_content = f"""<p>You have a new signature request.</p>
-                        <p>Message: {message}</p><a href='{link}'>Sign Document</a>"""
-    send_email(email_to=email_to, subject=subject, html_content=html_content)
+                        <p>Message: {message}</p>
+                        <p>Please <a href='{link}'>click here</a> to sign the document.</p>"""
+    return send_email(email_to=email_to, subject=subject, html_content=html_content)
+
+
+def send_signature_request_notification_email(
+    email_to: str, signature_request_name: str, signature_request_id: str, status: str,
+    documents: Optional[List[Path]] = None
+) -> emails.Message:
+    subject = f"""Signature Request Status Update for '{signature_request_name}' \
+                  whith id: '{signature_request_id}' \
+                  """
+
+    # Prepare email attachments
+    attachments = []
+    for document_path in documents:
+        with open(document_path, 'rb') as f:
+            attachments.append((document_path.name, f.read(), 'application/pdf'))
+    # Mapping status to user-friendly messages
+    status_messages = {
+        "draft": "The document is still in draft mode and hasn't been sent.",
+        "sent": "The document has been sent out for signatures.",
+        "completed": "All required parties have signed the document, and the process is now completed.",
+        "expired": "The signature request has expired without being completed.",
+        "canceled": "The signature request has been canceled."
+    }
+
+    # Generate a more detailed message based on the status
+    detailed_message = status_messages.get(status, "There has been an update to your document.")
+
+    # HTML content enhanced for better readability and formatting
+    html_content = f"""
+    <html>
+        <head></head>
+        <body>
+            <p>Hello,</p>
+            <p>This is a notification regarding the signature request for the document
+            titled <strong>'{signature_request_name}'</strong>.</p>
+            <p><strong>Status:</strong> {status.capitalize()}</p>
+            <p><strong>Details:</strong> {detailed_message}</p>
+            <p>
+            If you have any questions or require further assistance, please do not hesitate to contact us.
+            </p>
+            <p>Thank you for using our services!</p>
+        </body>
+    </html>
+    """
+
+    return send_email(email_to=email_to, subject=subject, html_content=html_content, attachments=attachments)

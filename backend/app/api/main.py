@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.routes import (
     audit_logs,
     documents,
+    doc_signature,
     fields,
     items,
     login,
@@ -26,3 +27,5 @@ api_router.include_router(
 api_router.include_router(
     signature_requests.router, prefix="/signature_requests", tags=["signature_requests"]
 )
+
+api_router.include_router(doc_signature.router, prefix="/signe", tags=["documents"])

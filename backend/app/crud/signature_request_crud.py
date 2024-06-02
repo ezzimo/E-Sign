@@ -3,7 +3,7 @@ import logging
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from app.models.models import Document, DocField, Signatory, SignatureRequest, User
+from app.models.models import Document, DocField, Signatory, SignatureRequest, User, ReminderSettings
 from app.schemas.schemas import (
     SignatureRequestCreate,
     SignatureRequestUpdate,
@@ -23,8 +23,8 @@ def create_signature_request(
         name=request_data.name,
         delivery_mode=request_data.delivery_mode,
         ordered_signers=request_data.ordered_signers,
-        reminder_settings=request_data.reminder_settings,
-        expiration_date=request_data.expiration_date,
+        message=request_data.message,
+        expiry_date=request_data.expiry_date,
         sender_id=sender_id,
     )
     db.add(signature_request)
@@ -71,19 +71,31 @@ def create_signature_request(
                 optional=field_data.optional,
                 mention=field_data.mention,
                 text=field_data.text,
-                # Only include coordinates if valid
-                x=field_data.x if field_data.x else None,
-                y=field_data.y if field_data.y else None,
-                height=field_data.height if field_data.height else None,
-                width=field_data.width if field_data.width else None,
+                x=field_data.x,
+                y=field_data.y,
+                height=field_data.height,
+                width=field_data.width,
             )
 
             db.add(new_field)
             db.commit()
             db.refresh(new_field)
 
+    # Create reminder settings if provided
+    if request_data.reminder_settings:
+        reminder_settings = ReminderSettings(
+            interval_in_days=request_data.reminder_settings.interval_in_days,
+            max_occurrences=request_data.reminder_settings.max_occurrences,
+            timezone=request_data.reminder_settings.timezone,
+            request_id=signature_request.id,
+        )
+        db.add(reminder_settings)
         db.commit()
+        db.refresh(reminder_settings)
+        signature_request.reminder_settings = reminder_settings
 
+    db.commit()
+    db.refresh(signature_request)
     return signature_request
 
 

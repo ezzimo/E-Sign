@@ -38,6 +38,7 @@ class User(UserBase, table=True):
 class DocumentStatus(enum.Enum):
     DRAFT = "draft"
     SENT_FOR_SIGNATURE = "sent for signature"
+    VIEWED = "viewed"
     SIGNED = "signed"
     REJECTED = "rejected"
 
@@ -96,6 +97,20 @@ class Document(BaseModel, table=True):
         back_populates="documents",
         link_model=RequestDocumentLink
     )
+    signature_details: Optional["DocumentSignatureDetails"] = Relationship(back_populates="document")
+
+
+class DocumentSignatureDetails(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    document_id: int = Field(foreign_key="document.id")
+    signed_hash: str = Field(description="SHA-256 hash of the signed document")
+    timestamp: datetime = Field(
+        default_factory=datetime.now, description="The time when the document was signed"
+    )
+    certified_timestamp: Optional[str] = Field(default=None, description="Certified timestamp if available")
+    ip_address: Optional[str] = Field(default=None, description="IP address of the signer")
+
+    document: Document = Relationship(back_populates="signature_details")
 
 
 class DocField(BaseModel, table=True):
@@ -189,6 +204,9 @@ class SignatureRequest(BaseModel, table=True):
         link_model=RequestSignatoryLink
     )
     audit_logs: List["AuditLog"] = Relationship(back_populates="signature_request")
+    reminder_settings: Optional[ReminderSettings] = Relationship(
+        back_populates="request"
+    )
 
 
 class AuditLogAction(str, Enum):

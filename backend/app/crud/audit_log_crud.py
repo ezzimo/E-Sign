@@ -1,5 +1,4 @@
 from sqlmodel import Session, select
-
 from app.models.models import AuditLog
 from app.schemas.schemas import AuditLogCreate
 
