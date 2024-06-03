@@ -184,29 +184,40 @@ def verify_otp(
     session.refresh(signature_request)
 
     for document in signature_request.documents:
-        file_path = STATIC_FILES_DIR / f"{document.owner_id}_{document.file}"
-
         for signatory in signature_request.signatories:
             for field in signatory.fields:
                 if field.document_id == document.id:
-                    add_fields_to_pdf(str(file_path), field, signatory)
-                    apply_pdf_security(str(file_path))
-                    pdf_hash = generate_pdf_hash(str(file_path))
-                    logger.info(
-                        f"Generated hash for document {document.id}: {pdf_hash}"
+                    # Pass document.file directly
+                    add_fields_to_pdf(
+                        document.file, field, signatory, document.owner_id
                     )
+        apply_pdf_security(
+            str(
+                STATIC_FILES_DIR
+                / "signed_documents"
+                / f"{document.owner_id}_{document.file}"
+            )
+        )
+        pdf_hash = generate_pdf_hash(
+            str(
+                STATIC_FILES_DIR
+                / "signed_documents"
+                / f"{document.owner_id}_{document.file}"
+            )
+        )
+        logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
 
-                    # Storing the hash and other details
-                    document_signature_details = DocumentSignatureDetailsCreate(
-                        document_id=document.id,
-                        signed_hash=pdf_hash,
-                        timestamp=datetime.now(),
-                        ip_address=request.client.host,
-                    )
-                    signed_document_crud.create_document_signature_details(
-                        session,
-                        document_signature_details,
-                    )
+        # Storing the hash and other details
+        document_signature_details = DocumentSignatureDetailsCreate(
+            document_id=document.id,
+            signed_hash=pdf_hash,
+            timestamp=datetime.now(),
+            ip_address=request.client.host,
+        )
+        signed_document_crud.create_document_signature_details(
+            session,
+            document_signature_details,
+        )
 
     session.commit()
     # Send notification email

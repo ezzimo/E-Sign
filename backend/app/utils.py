@@ -30,9 +30,9 @@ def send_email(
     email_to: str,
     subject: str = "",
     html_content: str = "",
-    attachments: Optional[List[Tuple[str, str, str]]] = None  # New parameter for attachments
-) -> None:
-    assert settings.emails_enabled, "no provided configuration for email variables"
+    attachments: Optional[List[Tuple[str, str, str]]] = None,
+) -> emails.Message:
+    assert settings.emails_enabled, "No provided configuration for email variables"
     message = emails.Message(
         subject=subject,
         html=html_content,
@@ -45,8 +45,8 @@ def send_email(
             message.attach(
                 data=content,
                 filename=filename,
-                maintype=mimetype.split('/')[0],
-                subtype=mimetype.split('/')[1],
+                maintype=mimetype.split("/")[0],
+                subtype=mimetype.split("/")[1],
             )
 
     smtp_options = {"host": settings.SMTP_HOST, "port": settings.SMTP_PORT}
@@ -58,8 +58,10 @@ def send_email(
         smtp_options["user"] = settings.SMTP_USER
     if settings.SMTP_PASSWORD:
         smtp_options["password"] = settings.SMTP_PASSWORD
+
     response = message.send(to=email_to, smtp=smtp_options)
     logging.info(f"send email result: {response}")
+    return response
 
 
 def generate_test_email(email_to: str) -> EmailData:
@@ -139,29 +141,35 @@ def send_signature_request_email(
 
 
 def send_signature_request_notification_email(
-    email_to: str, signature_request_name: str, signature_request_id: str, status: str,
-    documents: Optional[List[Path]] = None
+    email_to: str,
+    signature_request_name: str,
+    signature_request_id: str,
+    status: str,
+    documents: Optional[List[Path]] = None,  # Type hint corrected
 ) -> emails.Message:
-    subject = f"""Signature Request Status Update for '{signature_request_name}' \
-                  whith id: '{signature_request_id}' \
-                  """
+    subject = f"""Signature Request Status Update for \
+    '{signature_request_name}' with id: '{signature_request_id}'"""
 
     # Prepare email attachments
     attachments = []
-    for document_path in documents:
-        with open(document_path, 'rb') as f:
-            attachments.append((document_path.name, f.read(), 'application/pdf'))
+    if documents is not None:  # Check if documents is not None before iterating
+        for document_path in documents:
+            with open(document_path, "rb") as f:
+                attachments.append((document_path.name, f.read(), "application/pdf"))
+
     # Mapping status to user-friendly messages
     status_messages = {
         "draft": "The document is still in draft mode and hasn't been sent.",
         "sent": "The document has been sent out for signatures.",
         "completed": "All required parties have signed the document, and the process is now completed.",
         "expired": "The signature request has expired without being completed.",
-        "canceled": "The signature request has been canceled."
+        "canceled": "The signature request has been canceled.",
     }
 
     # Generate a more detailed message based on the status
-    detailed_message = status_messages.get(status, "There has been an update to your document.")
+    detailed_message = status_messages.get(
+        status, "There has been an update to your document."
+    )
 
     # HTML content enhanced for better readability and formatting
     html_content = f"""
@@ -181,4 +189,9 @@ def send_signature_request_notification_email(
     </html>
     """
 
-    return send_email(email_to=email_to, subject=subject, html_content=html_content, attachments=attachments)
+    return send_email(
+        email_to=email_to,
+        subject=subject,
+        html_content=html_content,
+        attachments=attachments,
+    )

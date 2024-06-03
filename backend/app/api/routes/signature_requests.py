@@ -2,7 +2,7 @@ import logging
 import sys
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_db
 from app.crud.signature_request_crud import (
@@ -17,11 +17,14 @@ from app.crud.signature_request_crud import (
 from app.crud import audit_log_crud, document_crud
 from app.models.models import (
     User,
+    Document,
     DocumentStatus,
     AuditLogAction,
+    Signatory,
     SignatureRequestStatus,
 )
 from app.schemas.schemas import (
+    DocumentOut,
     ReminderSettingsSchema,
     SignatoryOut,
     SignatureRequestCreate,
@@ -136,12 +139,25 @@ def initiate_signature_request(
         )
 
         # Send notification email
-        send_signature_request_notification_email(
+        email_response = send_signature_request_notification_email(
             signature_request_data.sender.email,
             signature_request_data.name,
             signature_request_data.id,
-            signature_request_data.status.value,
+            signature_request_data.status.value
         )
+
+        if email_response is not None and email_response.status_code == 250:
+            # Logic for successful email sending
+            logging.info("Email sent successfully.")
+        else:
+            # Logic for handling failed email attempts
+            error_detail = "Failed to send email due to server error."
+            if email_response:
+                error_detail += f" Server responded with status: {email_response.status_code}."
+            logging.error(error_detail)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_detail
+            )
     else:
         # Email sending failed, raise an error
         error_message = f"""
@@ -152,9 +168,15 @@ def initiate_signature_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
         )
 
-    # Extracting IDs for documents and signatories
-    document_ids = [document.id for document in signature_request_data.documents]
-    signatory_ids = [signatory.id for signatory in signature_request_data.signatories]
+    # When loading documents, include necessary joins or subqueries:
+    documents = db.exec(
+        select(Document).where(Document.id.in_([doc.id for doc in signature_request_data.documents]))
+    ).all()
+
+    # Do similar for signatories:
+    signatories = db.exec(
+        select(Signatory).where(Signatory.id.in_([sig.id for sig in signature_request_data.signatories]))
+    ).all()
 
     # Create a response object with the appropriate structure
     response_data = SignatureRequestRead(
@@ -173,8 +195,8 @@ def initiate_signature_request(
         ),
         expiry_date=signature_request_data.expiry_date,
         message=signature_request_data.message,
-        documents=document_ids,
-        signatories=signatory_ids,
+        documents=[DocumentOut.from_orm(doc) for doc in documents],
+        signatories=[SignatoryOut.from_orm(sig) for sig in signatories],
     )
 
     return response_data

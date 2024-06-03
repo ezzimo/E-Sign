@@ -182,8 +182,6 @@ class RadioCreate(BaseModel):
 
 
 class FieldCreate(FieldBase):
-    signer_id: int | None = None
-    document_id: int | None = None
     x: int | None = None
     y: int | None = None
     height: int | None = None
@@ -192,6 +190,9 @@ class FieldCreate(FieldBase):
     mention: str | None = None
     name: str | None = None
     checked: bool | None = None
+    document_id: int | None = None
+    signature_request_id: int | None = None
+    signer_id: int | None = None
     max_length: int | None = None
     question: str | None = None
     instruction: str | None = None
@@ -306,8 +307,8 @@ class SignatureRequestRead(SignatureRequestBase):
     sender_id: int
     created_at: datetime
     updated_at: datetime
-    documents: List[int]
-    signatories: List[int]
+    documents: List[DocumentOut]
+    signatories: List[SignatoryOut]
 
     class Config:
         from_attributes = True

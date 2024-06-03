@@ -142,7 +142,7 @@ def draw_text_field(c, field):
 
 
 def draw_mention_field(c, field):
-    c.drawString(field.x, field.y, field.mention)
+    c.drawString(field.x, field.y, f"{field.mention}")
 
 
 def draw_read_only_text_field(c, field):
@@ -150,10 +150,20 @@ def draw_read_only_text_field(c, field):
 
 
 def draw_checkbox_field(c, field):
-    c.rect(field.x, field.y, field.width, field.height)
     if field.checked:
-        c.line(field.x, field.y, field.x + field.width, field.y + field.height)
-        c.line(field.x + field.width, field.y, field.x, field.y + field.height)
+        # Adjusting the size for drawing the check, to fit within the expected box size
+        check_mark_size = field.size / 2
+        start_x = field.x
+        start_y = field.y
+        end_x = start_x + check_mark_size
+        end_y = start_y + check_mark_size
+
+        # Draw a simple check mark (like a tick)
+        # This draws one line from bottom left to top right
+        c.line(start_x, start_y, end_x, end_y)
+
+        # Optional: Add another line from top left to bottom right to form an 'X'
+        c.line(start_x, end_y, end_x, start_y)
 
 
 def draw_radio_group_field(c, field):
@@ -179,37 +189,46 @@ def draw_doc_field(c, field, signatory):
         draw_radio_group_field(c, field)
 
 
-def add_fields_to_pdf(file_path, field, signatory):
+def add_fields_to_pdf(document_filename, field, signatory, owner_id):
+    base_path = UPLOAD_DIR / f"{owner_id}_{document_filename}"
+    signed_path = UPLOAD_DIR / "signed_documents" / f"{owner_id}_{document_filename}"
+
+    # Check if file exists in 'signed_documents'
+    file_path = signed_path if signed_path.exists() else base_path
+
     logger.info(f"Adding fields to PDF: {file_path}")
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=letter)
-    can.setFont("Helvetica", 12)
 
     draw_doc_field(can, field, signatory)
     can.save()
 
+    # Process the PDF modifications
     packet.seek(0)
     new_pdf = PyPDF2.PdfReader(packet)
     existing_pdf = PyPDF2.PdfReader(open(file_path, "rb"))
     output = PyPDF2.PdfWriter()
 
-    # Define new folder path
-    new_folder_path = UPLOAD_DIR / "signed_documents"
-    new_folder_path.mkdir(exist_ok=True)  # Make sure the directory exists
-
-    # Create new file path in the signed_documents folder
-    new_file_path = new_folder_path / Path(file_path).name
-
-    for i in range(len(existing_pdf.pages)):
-        page = existing_pdf.pages[i]
-        if i == field.page - 1:
-            logger.info(f"Merging new content to page {i}")
-            page.merge_page(new_pdf.pages[0])
+    target_page_index = field.page - 1  # Assuming 'page' is 1-indexed
+    for page_number, page in enumerate(existing_pdf.pages):
+        if page_number == target_page_index:
+            if new_pdf.pages:
+                page.merge_page(new_pdf.pages[0])
         output.add_page(page)
 
-    logger.info(f"Writing updated PDF to {new_file_path}")
+    # Saving the modified PDF
+    if "signed_documents" not in str(file_path):
+        new_folder_path = file_path.parent / "signed_documents"
+        new_folder_path.mkdir(exist_ok=True)
+        new_file_name = file_path.name
+        new_file_path = new_folder_path / new_file_name
+    else:
+        new_file_path = file_path
+
     with open(new_file_path, "wb") as outputStream:
         output.write(outputStream)
+
+    logger.info(f"Written updated PDF to {new_file_path}")
 
 
 def generate_pdf_hash(file_path):

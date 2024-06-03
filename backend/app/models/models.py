@@ -121,9 +121,17 @@ class DocField(BaseModel, table=True):
     y: Optional[int] = None
     height: Optional[int] = None
     width: Optional[int] = None
+    optional: Optional[bool] = None
+    mention: Optional[str] = None
+    name: Optional[str] = None
+    checked: Optional[bool] = None
     document_id: int = Field(foreign_key="document.id")
-    signature_request_id: int = Field(foreign_key="signaturerequest.id")
+    signature_request_id: Optional[int] = Field(foreign_key="signaturerequest.id")
     signer_id: Optional[int] = Field(default=None, foreign_key="signatory.id")
+    max_length: Optional[int] = None
+    question: Optional[str] = None
+    instruction: Optional[str] = None
+    text: Optional[str] = None
 
     signatory: Optional["Signatory"] = Relationship(back_populates="fields")
     radios: List["Radio"] = Relationship(back_populates="doc_field")
