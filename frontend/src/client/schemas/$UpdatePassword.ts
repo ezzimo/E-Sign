@@ -3,14 +3,17 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $UpdatePassword = {
-	properties: {
-		current_password: {
-			type: "string",
-			isRequired: true,
-		},
-		new_password: {
-			type: "string",
-			isRequired: true,
-		},
-	},
+    properties: {
+        current_password: {
+            type: 'string',
+            description: `Current password`,
+            isRequired: true,
+        },
+        new_password: {
+            type: 'string',
+            description: `New password`,
+            isRequired: true,
+            minLength: 8,
+        },
+    },
 } as const;

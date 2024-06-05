@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
-import { DocumentRead } from "../../client/models/DocumentRead";
-import { DocumentService } from "../../client/services/DocumentService";
+import { DocumentOut } from "../../client/models/DocumentOut";
+import { DocumentsService } from "../../client/services/DocumentsService";
 
 const DocumentList = () => {
-	const [documents, setDocuments] = useState<DocumentRead[]>([]);
+	const [documents, setDocuments] = useState<DocumentOut[]>([]);
 
 	useEffect(() => {
 		const loadDocuments = async () => {
-			const docs = await DocumentService.fetchDocuments();
+			const docs = await DocumentsService.readDocuments({ skip: 0, limit: 100 });
 			setDocuments(docs);
 		};
 		loadDocuments();

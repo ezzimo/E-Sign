@@ -3,17 +3,17 @@
 /* tslint:disable */
 /* eslint-disable */
 export const $ItemsOut = {
-	properties: {
-		data: {
-			type: "array",
-			contains: {
-				type: "ItemOut",
-			},
-			isRequired: true,
-		},
-		count: {
-			type: "number",
-			isRequired: true,
-		},
-	},
+    properties: {
+        data: {
+            type: 'array',
+            contains: {
+                type: 'ItemOut',
+            },
+            isRequired: true,
+        },
+        count: {
+            type: 'number',
+            isRequired: true,
+        },
+    },
 } as const;

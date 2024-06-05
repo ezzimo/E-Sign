@@ -4,6 +4,7 @@
 /* eslint-disable */
 
 export type ItemUpdate = {
-	title?: string | null;
-	description?: string | null;
+    title?: (string | null);
+    description?: (string | null);
 };
+

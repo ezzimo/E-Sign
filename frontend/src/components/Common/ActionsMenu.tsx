@@ -17,18 +17,18 @@ import {
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { FiEdit, FiTrash, FiEye } from "react-icons/fi";
 import { ItemOut, UserOut } from "../../client";
-import { DocumentRead } from "../../client/models/DocumentRead";
+import { DocumentOut } from "../../client/models/DocumentOut";
 import { SignatureRequestRead } from "../../client/models/SignatureRequestRead";
 import EditUser from "../Admin/EditUser";
 import EditDocument from "../Documents/Editdocument";
 import EditItem from "../Items/EditItem";
 import DeleteAlert from "./DeleteAlert";
 import DocumentViewer from "../Documents/DocumentViewer";
-import { DocumentService } from "../../client/services/DocumentService";
+import { DocumentsService } from "../../client/services/DocumentsService";
 
 interface ActionsMenuProps {
     type: string;
-    value: ItemOut | UserOut | DocumentRead | SignatureRequestRead;
+    value: ItemOut | UserOut | DocumentOut | SignatureRequestRead;
     disabled?: boolean;
 }
 
@@ -38,13 +38,13 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
     const viewModal = useDisclosure();
     const toast = useToast();
 
-    const [documentDetails, setDocumentDetails] = useState<DocumentRead | null>(null);
+    const [documentDetails, setDocumentDetails] = useState<DocumentOut | null>(null);
     const [fileBlob, setFileBlob] = useState<Blob | null>(null);
 
     const handleDelete = async () => {
         try {
             if (type === "Document") {
-                await DocumentService.deleteDocument(value.id as number);
+                await DocumentsService.deleteDocument({ documentId: value.id as number });
                 toast({
                     title: "Document deleted.",
                     description: "The document has been deleted successfully.",
@@ -68,11 +68,11 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
 
     const handleViewDocument = async () => {
         try {
-            const details = await DocumentService.fetchDocumentById(value.id as number);
+            const details = await DocumentsService.getDocumentFile({ documentId: value.id as number });
             setDocumentDetails(details);
     
             // Fetch the document file blob
-            const file = await DocumentService.fetchDocumentFile(value.id as number);
+            const file = await DocumentsService.getDocumentFile({ documentId: value.id as number });
             setFileBlob(file);
     
             viewModal.onOpen();
@@ -108,7 +108,7 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
             case "Document":
                 return (
                     <EditDocument
-                        document={value as DocumentRead}
+                        document={value as DocumentOut}
                         isOpen={editModal.isOpen}
                         onClose={editModal.onClose}
                     />

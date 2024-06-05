@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { DocumentRead } from "../../client/models/DocumentRead";
+import { DocumentOut } from "../../client/models/DocumentOut";
 import { Document, Page, pdfjs } from 'react-pdf';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface DocumentViewerProps {
-    documentDetails: DocumentRead;
+    documentDetails: DocumentOut;
     fileBlob: Blob;
     fileType: string;
     fileName?: string;

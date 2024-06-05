@@ -1,84 +1,59 @@
-export const $SignatureRequestCreateSchema = {
-    type: "object",
+/* generated using openapi-typescript-codegen -- do no edit */
+/* istanbul ignore file */
+/* tslint:disable */
+/* eslint-disable */
+export const $SignatureRequestCreate = {
     properties: {
-        name: { type: "string" },
-        delivery_mode: { type: "string" },
-        ordered_signers: { type: "boolean" },
-        reminder_settings: {
-            type: "object",
-            properties: {
-                interval_in_days: { type: "number" },
-                max_occurrences: { type: "number" },
-                timezone: { type: "string" }
-            },
-            required: ["interval_in_days", "max_occurrences", "timezone"]
+        name: {
+            type: 'string',
+            isRequired: true,
         },
-        expiration_date: { type: "string", format: "date-time" },
-        message: { type: "string" },
-        expiry_date: { type: "string", format: "date-time" },
+        delivery_mode: {
+            type: 'string',
+            isRequired: true,
+        },
+        ordered_signers: {
+            type: 'boolean',
+            isRequired: true,
+        },
+        reminder_settings: {
+            type: 'any-of',
+            contains: [{
+                type: 'ReminderSettingsSchema',
+            }, {
+                type: 'null',
+            }],
+        },
+        expiry_date: {
+            type: 'any-of',
+            contains: [{
+                type: 'string',
+                format: 'date-time',
+            }, {
+                type: 'null',
+            }],
+        },
+        message: {
+            type: 'any-of',
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
         signatories: {
-            type: "array",
-            items: {
-                type: "object",
-                properties: {
-                    info: {
-                        type: "object",
-                        properties: {
-                            first_name: { type: "string" },
-                            last_name: { type: "string" },
-                            email: { type: "string", format: "email" },
-                            phone_number: { type: "string" },
-                            signing_order: { type: "number" },
-                            role: { type: "string" }
-                        },
-                        required: ["first_name", "last_name", "email", "phone_number", "signing_order", "role"]
-                    },
-                    fields: {
-                        type: "array",
-                        items: {
-                            type: "object",
-                            properties: {
-                                type: { type: "string" },
-                                page: { type: "number" },
-                                signer_id: { type: "number" },
-                                document_id: { type: "string" },
-                                x: { type: "number" },
-                                y: { type: "number" },
-                                height: { type: "number" },
-                                width: { type: "number" },
-                                optional: { type: "boolean" },
-                                mention: { type: "string" },
-                                name: { type: "string" },
-                                checked: { type: "boolean" },
-                                max_length: { type: "number" },
-                                question: { type: "string" },
-                                instruction: { type: "string" },
-                                text: { type: "string" },
-                                radios: {
-                                    type: "array",
-                                    items: {
-                                        type: "object",
-                                        properties: {
-                                            name: { type: "string" },
-                                            x: { type: "number" },
-                                            y: { type: "number" },
-                                            size: { type: "number" }
-                                        },
-                                        required: ["name", "x", "y", "size"]
-                                    }
-                                }
-                            },
-                            required: ["type", "page", "signer_id", "document_id", "x", "y", "height", "width", "optional", "mention", "name", "checked", "max_length", "question", "instruction", "text", "radios"]
-                        }
-                    }
-                },
-                required: ["info", "fields"]
-            }
+            type: 'array',
+            contains: {
+                type: 'SignatoryData',
+            },
+            isRequired: true,
         },
         documents: {
-            type: "array",
-            items: { type: "number" }
-        }
+            type: 'array',
+            contains: {
+                type: 'number',
+            },
+            isRequired: true,
+        },
     },
-    required: ["name", "delivery_mode", "ordered_signers", "reminder_settings", "expiration_date", "message", "expiry_date", "signatories", "documents"]
-};
+} as const;

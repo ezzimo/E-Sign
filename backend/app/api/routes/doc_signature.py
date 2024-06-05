@@ -154,6 +154,7 @@ def verify_otp(
     otp: int = Form(...),
     signature_request_id: int = Form(...),
 ):
+    # Example OTP store check
     if email not in otp_store:
         raise HTTPException(status_code=400, detail="OTP not found")
     otp_data = otp_store[email]
@@ -164,6 +165,7 @@ def verify_otp(
         raise HTTPException(status_code=400, detail="Invalid OTP")
     del otp_store[email]
 
+    # Log the OTP verification
     audit_log_crud.create_audit_log(
         session,
         AuditLogCreate(
@@ -174,40 +176,33 @@ def verify_otp(
         ),
     )
 
+    # Process the signature request
     signature_request = session.get(SignatureRequest, signature_request_id)
     if not signature_request:
         raise HTTPException(status_code=404, detail="Signature request not found")
 
     signature_request.status = SignatureRequestStatus.COMPLETED
-    session.add(signature_request)
     session.commit()
-    session.refresh(signature_request)
 
+    # Process each document associated with the signature request
     for document in signature_request.documents:
-        for signatory in signature_request.signatories:
-            for field in signatory.fields:
-                if field.document_id == document.id:
-                    # Pass document.file directly
-                    add_fields_to_pdf(
-                        document.file, field, signatory, document.owner_id
-                    )
-        apply_pdf_security(
-            str(
-                STATIC_FILES_DIR
-                / "signed_documents"
-                / f"{document.owner_id}_{document.file}"
-            )
+        document.status = DocumentStatus.SIGNED  # Update document status to SIGNED
+        session.commit()  # Commit the update to the database
+
+        # Additional processing like adding fields to PDF and securing it
+        # Assuming STATIC_FILES_DIR is predefined and these methods are implemented
+        final_pdf_path = (
+            STATIC_FILES_DIR
+            / "signed_documents"
+            / f"{document.owner_id}_{document.file}"
         )
-        pdf_hash = generate_pdf_hash(
-            str(
-                STATIC_FILES_DIR
-                / "signed_documents"
-                / f"{document.owner_id}_{document.file}"
-            )
-        )
+        add_fields_to_pdf(document.file, document.id)
+        apply_pdf_security(str(final_pdf_path))
+
+        pdf_hash = generate_pdf_hash(str(final_pdf_path))
         logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
 
-        # Storing the hash and other details
+        # Create and store the document signature details
         document_signature_details = DocumentSignatureDetailsCreate(
             document_id=document.id,
             signed_hash=pdf_hash,
@@ -215,17 +210,11 @@ def verify_otp(
             ip_address=request.client.host,
         )
         signed_document_crud.create_document_signature_details(
-            session,
-            document_signature_details,
+            session, document_signature_details
         )
 
-    session.commit()
-    # Send notification email
-    signed_documents = [
-        STATIC_FILES_DIR / "signed_documents" / f"{document.owner_id}_{document.file}"
-        for document in signature_request.documents
-    ]
-    # Send email to the owner and all signatories
+    # Notify all related parties via email
+    signed_documents = [final_pdf_path for document in signature_request.documents]
     recipients = [signature_request.sender.email] + [
         signatory.email for signatory in signature_request.signatories
     ]
@@ -233,7 +222,7 @@ def verify_otp(
         send_signature_request_notification_email(
             email_to=recipient,
             signature_request_name=signature_request.name,
-            signature_request_id=signature_request.id,
+            signature_request_id=signature_request_id,
             status=signature_request.status.value,
             documents=signed_documents,
         )

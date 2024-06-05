@@ -47,7 +47,6 @@ const AddUser: React.FC<AddUserProps> = ({ isOpen, onClose }) => {
 		criteriaMode: "all",
 		defaultValues: {
 			email: "",
-			full_name: "",
 			first_name: "",
 			last_name: "",
 			password: "",
@@ -109,18 +108,6 @@ const AddUser: React.FC<AddUserProps> = ({ isOpen, onClose }) => {
 							/>
 							{errors.email && (
 								<FormErrorMessage>{errors.email.message}</FormErrorMessage>
-							)}
-						</FormControl>
-						<FormControl mt={4} isInvalid={!!errors.full_name}>
-							<FormLabel htmlFor="name">Full name</FormLabel>
-							<Input
-								id="name"
-								{...register("full_name")}
-								placeholder="Full name"
-								type="text"
-							/>
-							{errors.full_name && (
-								<FormErrorMessage>{errors.full_name.message}</FormErrorMessage>
 							)}
 						</FormControl>
 						<FormControl mt={4} isInvalid={!!errors.first_name}>

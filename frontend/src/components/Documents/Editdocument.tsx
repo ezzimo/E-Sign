@@ -12,18 +12,18 @@ import {
 } from "@chakra-ui/react";
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { DocumentRead } from "../../client/models/DocumentRead";
-import { DocumentUpdate } from "../../client/models/DocumentUpdate";
-import { DocumentService } from "../../client/services/DocumentService";
+import { DocumentOut } from "../../client/models/DocumentOut";
+import { Body_documents_update_document } from "../../client/models/Body_documents_update_document";
+import { DocumentsService } from "../../client/services/DocumentsService";
 
 interface EditDocumentProps {
-	document: DocumentRead;
+	document: DocumentOut;
 	isOpen: boolean;
 	onClose: () => void;
 }
 
 const EditDocument: React.FC<EditDocumentProps> = ({ document, isOpen, onClose }) => {
-	const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<DocumentUpdate>({
+	const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<Body_documents_update_document>({
 			defaultValues: {
 					title: document.title,
 					status: document.status,
@@ -37,10 +37,13 @@ const EditDocument: React.FC<EditDocumentProps> = ({ document, isOpen, onClose }
 			setNewFile(file);
 	};
 
-	const onSubmit = async (data: DocumentUpdate) => {
-			const updateData = { ...data, file: newFile };
-			await DocumentService.updateDocument(document.id, updateData);
-			onClose();
+	const onSubmit = async (data: Body_documents_update_document) => {
+		const formData = {
+			...data,
+			file: newFile,  // Assuming you want to include file updates
+		};
+		await DocumentsService.updateDocument({ documentId: document.id, formData });
+		onClose();
 	};
 
 	return (

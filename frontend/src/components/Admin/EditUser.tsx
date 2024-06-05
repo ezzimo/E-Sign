@@ -35,7 +35,6 @@ interface EditUserProps {
 interface UserUpdateForm extends UserUpdate {
 	first_name: string;
 	last_name: string;
-	confirm_password: string;
 }
 
 const EditUser: React.FC<EditUserProps> = ({ user, isOpen, onClose }) => {
@@ -46,7 +45,6 @@ const EditUser: React.FC<EditUserProps> = ({ user, isOpen, onClose }) => {
 		register,
 		handleSubmit,
 		reset,
-		getValues,
 		formState: { errors, isSubmitting, isDirty },
 	} = useForm<UserUpdateForm>({
 		mode: "onBlur",
@@ -73,9 +71,6 @@ const EditUser: React.FC<EditUserProps> = ({ user, isOpen, onClose }) => {
 	});
 
 	const onSubmit: SubmitHandler<UserUpdateForm> = async (data) => {
-		if (data.password === "") {
-			data.password = undefined;
-		}
 		mutation.mutate(data);
 	};
 
@@ -145,41 +140,6 @@ const EditUser: React.FC<EditUserProps> = ({ user, isOpen, onClose }) => {
 							/>
 							{errors.last_name && (
 								<FormErrorMessage>{errors.last_name.message}</FormErrorMessage>
-							)}
-						</FormControl>
-						<FormControl mt={4} isInvalid={!!errors.password}>
-							<FormLabel htmlFor="password">Set Password</FormLabel>
-							<Input
-								id="password"
-								{...register("password", {
-									minLength: {
-										value: 8,
-										message: "Password must be at least 8 characters",
-									},
-								})}
-								placeholder="Password"
-								type="password"
-							/>
-							{errors.password && (
-								<FormErrorMessage>{errors.password.message}</FormErrorMessage>
-							)}
-						</FormControl>
-						<FormControl mt={4} isInvalid={!!errors.confirm_password}>
-							<FormLabel htmlFor="confirm_password">Confirm Password</FormLabel>
-							<Input
-								id="confirm_password"
-								{...register("confirm_password", {
-									validate: (value) =>
-										value === getValues().password ||
-										"The passwords do not match",
-								})}
-								placeholder="Password"
-								type="password"
-							/>
-							{errors.confirm_password && (
-								<FormErrorMessage>
-									{errors.confirm_password.message}
-								</FormErrorMessage>
 							)}
 						</FormControl>
 						<Flex>

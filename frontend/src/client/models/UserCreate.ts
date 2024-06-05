@@ -4,9 +4,33 @@
 /* eslint-disable */
 
 export type UserCreate = {
-	email: string;
-	is_active?: boolean;
-	is_superuser?: boolean;
-	full_name?: string | null;
-	password: string;
+    /**
+     * User email address
+     */
+    email: string;
+    /**
+     * Is user active?
+     */
+    is_active?: boolean;
+    /**
+     * Is user a superuser?
+     */
+    is_superuser?: boolean;
+    /**
+     * User's password
+     */
+    password: string;
+    /**
+     * User's first name
+     */
+    first_name: string;
+    /**
+     * User's last name
+     */
+    last_name: string;
+    /**
+     * User's role
+     */
+    role?: (string | null);
 };
+

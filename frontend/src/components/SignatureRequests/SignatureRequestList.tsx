@@ -1,19 +1,9 @@
-import { fetchSignatureRequests } from "../../client/services/SignatureRequestsService";
-import {
-  Container,
-  Flex,
-  Heading,
-  Spinner,
-  Table,
-  TableContainer,
-  Tbody,
-  Td,
-  Th,
-  Thead,
-  Tr,
-} from "@chakra-ui/react";
 import { useQuery } from "react-query";
-import { type ApiError } from "../../client";
+import {
+  Container, Flex, Heading, Spinner, Table, TableContainer, Tbody, Td, Th, Thead, Tr
+} from "@chakra-ui/react";
+import { SignatureRequestsService } from "../../client/services/SignatureRequestsService";
+import { SignatureRequestRead } from "../../client/models/SignatureRequestRead";
 import ActionsMenu from "../Common/ActionsMenu";
 import Navbar from "../Common/Navbar";
 import useCustomToast from "../../hooks/useCustomToast";
@@ -25,11 +15,11 @@ const SignatureRequestList = () => {
     isLoading,
     isError,
     error,
-  } = useQuery("signatureRequests", fetchSignatureRequests);
+  } = useQuery<Array<SignatureRequestRead>>("signatureRequests", SignatureRequestsService.listSignatureRequests);
 
   if (isError) {
-    const errDetail = (error as ApiError).body?.detail;
-    showToast("Something went wrong.", `${errDetail}`, "error");
+    const errDetail = (error as any).body?.detail || 'Unknown error occurred';
+    showToast("Something went wrong.", errDetail, "error");
   }
 
   return (
@@ -41,11 +31,7 @@ const SignatureRequestList = () => {
       ) : (
         signatureRequests && (
           <Container maxW="full">
-            <Heading
-              size="lg"
-              textAlign={{ base: "center", md: "left" }}
-              pt={12}
-            >
+            <Heading size="lg" textAlign={{ base: "center", md: "left" }} pt={12}>
               Signature Requests Management
             </Heading>
             <Navbar type={"Request"} />
@@ -66,9 +52,9 @@ const SignatureRequestList = () => {
                       <Td>{request.id}</Td>
                       <Td>{request.name}</Td>
                       <Td>{request.delivery_mode}</Td>
-                      <Td>{request.expiration_date || "N/A"}</Td>
+                      <Td>{request.expiry_date || "N/A"}</Td>
                       <Td>
-                        <ActionsMenu type={"SignatureRequest"} value={request} />
+                        <ActionsMenu type="SignatureRequest" value={request} />
                       </Td>
                     </Tr>
                   ))}
