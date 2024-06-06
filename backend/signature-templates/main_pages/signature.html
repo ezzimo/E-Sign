@@ -1,10 +1,10 @@
 {% extends "shared/base.html" %}
 
-{% block title %} 
+{% block title %}
   <title>Document Signing</title>
-{% endblock %} 
+{% endblock %}
 
-{% block content %} 
+{% block content %}
 <div class="container mt-5">
     <div class="row">
         <div class="col-3">
@@ -12,19 +12,20 @@
                 <h5 class="sidebar-title">Documents</h5>
                 <ul class="list-group" id="document-list">
                     {% for doc_url in document_urls %}
-                    <li class="list-group-item">
+                    <li class="list-group-item document-item" data-read="false">
                         <a href="#" class="document-link" data-url="{{ url_for('static', path=doc_url) }}">
                             Document {{ loop.index }}
-                        </a>
+                        </a> <span class="read-status">(Unread)</span>
                     </li>
                     {% endfor %}
                 </ul>
                 <button class="btn btn-primary mt-3 w-100" id="download-all-btn">Download All</button>
+                <button class="btn btn-success mt-3 w-100" id="draw-signature-btn">Draw Signature</button>
             </div>
         </div>
         <div class="col-9">
             <div class="document-viewer">
-                <iframe id="pdf-frame" src="{{ url_for('static', path=document_urls[0]) }}" onload="checkScrollToEnd(this)" width="100%" height="800px" frameborder="0"></iframe>
+                <iframe id="pdf-frame" width="100%" height="800px" frameborder="0"></iframe>
                 <div class="document-controls text-center mt-3">
                     <button class="btn btn-secondary" id="prev-doc" disabled>Previous</button>
                     <button class="btn btn-secondary" id="next-doc" disabled>Next</button>
@@ -57,6 +58,25 @@
                     </div>
                     <button type="submit" class="btn btn-primary" disabled id="verify-otp-btn">Verify</button>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Signature Modal -->
+<div class="modal fade" id="signatureModal" tabindex="-1" aria-labelledby="signatureModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="signatureModalLabel">Sign Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <canvas id="signature-canvas" style="border: 1px solid #ccc; touch-action: none; width: 100%; height: 300px;"></canvas>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="clear-signature-btn">Clear</button>
+                <button class="btn btn-primary" id="save-signature-btn">Save Signature</button>
             </div>
         </div>
     </div>

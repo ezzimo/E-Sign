@@ -1,10 +1,13 @@
 import logging
 import sys
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_db
+from app.crud import audit_log_crud, document_crud
 from app.crud.signature_request_crud import (
     create_signature_request,
     delete_signature_request,
@@ -14,26 +17,28 @@ from app.crud.signature_request_crud import (
     get_signature_requests_by_document,
     update_signature_request,
 )
-from app.crud import audit_log_crud, document_crud
 from app.models.models import (
-    User,
+    AuditLogAction,
     Document,
     DocumentStatus,
-    AuditLogAction,
     Signatory,
     SignatureRequestStatus,
+    User,
 )
 from app.schemas.schemas import (
+    AuditLogCreate,
     DocumentOut,
     ReminderSettingsSchema,
     SignatoryOut,
     SignatureRequestCreate,
     SignatureRequestRead,
     SignatureRequestUpdate,
-    AuditLogCreate,
 )
-from app.utils import send_signature_request_email, send_signature_request_notification_email
 from app.services.file_service import generate_secure_link
+from app.utils import (
+    send_signature_request_email,
+    send_signature_request_notification_email,
+)
 
 # Create a logger for your application
 logging.basicConfig(
@@ -44,6 +49,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+STATIC_FILES_DIR = Path("/app/static/document_files")
 
 
 @router.get("/", response_model=list[SignatureRequestRead])
@@ -143,7 +149,7 @@ def initiate_signature_request(
             signature_request_data.sender.email,
             signature_request_data.name,
             signature_request_data.id,
-            signature_request_data.status.value
+            signature_request_data.status.value,
         )
 
         if email_response is not None and email_response.status_code == 250:
@@ -153,7 +159,9 @@ def initiate_signature_request(
             # Logic for handling failed email attempts
             error_detail = "Failed to send email due to server error."
             if email_response:
-                error_detail += f" Server responded with status: {email_response.status_code}."
+                error_detail += (
+                    f" Server responded with status: {email_response.status_code}."
+                )
             logging.error(error_detail)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_detail
@@ -170,12 +178,16 @@ def initiate_signature_request(
 
     # When loading documents, include necessary joins or subqueries:
     documents = db.exec(
-        select(Document).where(Document.id.in_([doc.id for doc in signature_request_data.documents]))
+        select(Document).where(
+            Document.id.in_([doc.id for doc in signature_request_data.documents])
+        )
     ).all()
 
     # Do similar for signatories:
     signatories = db.exec(
-        select(Signatory).where(Signatory.id.in_([sig.id for sig in signature_request_data.signatories]))
+        select(Signatory).where(
+            Signatory.id.in_([sig.id for sig in signature_request_data.signatories])
+        )
     ).all()
 
     # Create a response object with the appropriate structure
@@ -189,14 +201,16 @@ def initiate_signature_request(
         delivery_mode=signature_request_data.delivery_mode,
         ordered_signers=signature_request_data.ordered_signers,
         reminder_settings=(
-            ReminderSettingsSchema.model_validate(signature_request_data.reminder_settings)
+            ReminderSettingsSchema.model_validate(
+                signature_request_data.reminder_settings
+            )
             if signature_request_data.reminder_settings
             else None
         ),
         expiry_date=signature_request_data.expiry_date,
         message=signature_request_data.message,
-        documents=[DocumentOut.from_orm(doc) for doc in documents],
-        signatories=[SignatoryOut.from_orm(sig) for sig in signatories],
+        documents=[DocumentOut.model_validate(doc) for doc in documents],
+        signatories=[SignatoryOut.model_validate(sig) for sig in signatories],
     )
 
     return response_data
@@ -265,3 +279,34 @@ def list_signature_request_signers(request_id: int, db: Session = Depends(get_db
             status_code=404, detail="No signatories found for this signature request."
         )
     return signatories
+
+
+@router.get(
+    "/{signature_request_id}/documents/{document_id}/download",
+    response_class=FileResponse,
+)
+async def download_signed_document(
+    signature_request_id: int, document_id: int, db: Session = Depends(get_db)
+):
+    # Verify if the document is associated with the signature request and is signed
+    document = db.exec(
+        select(Document).where(
+            Document.id == document_id,
+            Document.signature_requests.any(id=signature_request_id),
+            Document.status == DocumentStatus.SIGNED,
+        )
+    ).first()
+
+    if not document:
+        raise HTTPException(
+            status_code=404, detail="Document not found or not signed yet"
+        )
+
+    pdf_path = (
+        STATIC_FILES_DIR / "signed_documents" / f"{document.owner_id}_{document.file}"
+    )
+
+    # Assuming document.file_url is the path to the file on disk
+    return FileResponse(
+        path=pdf_path, filename=document.title, media_type="application/pdf"
+    )

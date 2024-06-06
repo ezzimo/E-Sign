@@ -3,31 +3,30 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from sqlmodel import select
-
-from fastapi import APIRouter, HTTPException, Query, Request, Form
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
+from sqlmodel import select
 
 from app.api.deps import SessionDep
+from app.crud import audit_log_crud, signed_document_crud
 from app.models.models import (
+    AuditLogAction,
     Document,
     DocumentStatus,
     Signatory,
-    AuditLogAction,
     SignatureRequest,
     SignatureRequestStatus,
 )
+from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate
 from app.services.file_service import (
-    verify_secure_link_token,
-    send_otp_code,
+    add_fields_to_pdf,
     apply_pdf_security,
     generate_pdf_hash,
-    add_fields_to_pdf,
+    send_otp_code,
+    verify_secure_link_token,
 )
 from app.utils import send_signature_request_notification_email
-from app.crud import audit_log_crud, signed_document_crud
-from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate
 
 templates = Jinja2Templates(directory="signature-templates")
 logger = logging.getLogger(__name__)
@@ -146,7 +145,7 @@ def send_otp(
     return JSONResponse(content={"message": "OTP sent successfully"})
 
 
-@router.post("/verify_otp", response_class=JSONResponse)
+@router.post("/verify_otp", response_class=HTMLResponse)
 def verify_otp(
     request: Request,
     session: SessionDep,
@@ -186,11 +185,10 @@ def verify_otp(
 
     # Process each document associated with the signature request
     for document in signature_request.documents:
-        document.status = DocumentStatus.SIGNED  # Update document status to SIGNED
-        session.commit()  # Commit the update to the database
+        document.status = DocumentStatus.SIGNED
+        session.commit()
 
-        # Additional processing like adding fields to PDF and securing it
-        # Assuming STATIC_FILES_DIR is predefined and these methods are implemented
+        # Additional processing: adding fields to PDF and securing it
         final_pdf_path = (
             STATIC_FILES_DIR
             / "signed_documents"
@@ -227,6 +225,7 @@ def verify_otp(
             documents=signed_documents,
         )
 
-    return JSONResponse(
-        content={"message": "OTP verified and signature request completed successfully"}
+    return templates.TemplateResponse(
+        "main_pages/signature_success.html",
+        {"request": request, "message": "Document successfully signed!"},
     )
