@@ -97,6 +97,10 @@ async function initializeSignaturePage(email, signatureRequestId) {
 		$("#signatureModal").modal("show");
 	});
 
+	signButton.addEventListener("click", () => {
+		$("#otpModal").modal("show");
+	});
+
 	sendOtpBtn.addEventListener("click", sendOtp);
 	verifyOtpBtn.addEventListener("click", verifyOtp);
 
@@ -149,7 +153,7 @@ async function initializeSignaturePage(email, signatureRequestId) {
 					alert("Document signed successfully");
 					$("#otpModal").modal("hide");
 					resetModal();
-					window.location.href = "/success"; // Redirect to the success page
+					window.location.href = "/api/v1/signe/verify_otp"; // Redirect to the success page
 				} else {
 					alert("Failed to verify OTP");
 				}
@@ -165,10 +169,6 @@ async function initializeSignaturePage(email, signatureRequestId) {
 		otpInput.disabled = true;
 		verifyOtpBtn.disabled = true;
 	}
-
-	signButton.addEventListener("click", () => {
-		$("#signatureModal").modal("show");
-	});
 
 	const signaturePad = document
 		.getElementById("signature-canvas")

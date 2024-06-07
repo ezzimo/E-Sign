@@ -206,7 +206,12 @@ def verify_otp(
             / "signed_documents"
             / f"{document.owner_id}_{document.file}"
         )
-        add_fields_to_pdf(document.file, document.id)
+        for signatory in signature_request.signatories:
+            for field in signatory.fields:
+                if field.document_id == document.id:
+                    add_fields_to_pdf(
+                        document.file, field, signatory, document.owner_id
+                    )
         apply_pdf_security(str(final_pdf_path))
 
         pdf_hash = generate_pdf_hash(str(final_pdf_path))
