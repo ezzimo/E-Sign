@@ -1,7 +1,7 @@
 {% extends "shared/base.html" %}
 
 {% block title %}
-  <title>Document Signing</title>
+<title>Document Signing</title>
 {% endblock %}
 
 {% block content %}
@@ -11,9 +11,9 @@
             <div class="sidebar">
                 <h5 class="sidebar-title">Documents</h5>
                 <ul class="list-group" id="document-list">
-                    {% for doc_url in document_urls %}
+                    {% for doc_urls in document_urls %}
                     <li class="list-group-item document-item" data-read="false">
-                        <a href="#" class="document-link" data-url="{{ url_for('static', path=doc_url) }}">
+                        <a href="#" class="document-link" data-urls="{{ doc_urls }}">
                             Document {{ loop.index }}
                         </a> <span class="read-status">(Unread)</span>
                     </li>
@@ -25,7 +25,7 @@
         </div>
         <div class="col-9">
             <div class="document-viewer">
-                <iframe id="pdf-frame" width="100%" height="800px" frameborder="0"></iframe>
+                <div id="pdf-container" style="height: 800px; overflow: auto;"></div>
                 <div class="document-controls text-center mt-3">
                     <button class="btn btn-secondary" id="prev-doc" disabled>Previous</button>
                     <button class="btn btn-secondary" id="next-doc" disabled>Next</button>
@@ -72,7 +72,8 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <canvas id="signature-canvas" style="border: 1px solid #ccc; touch-action: none; width: 100%; height: 300px;"></canvas>
+                <canvas id="signature-canvas"
+                    style="border: 1px solid #ccc; touch-action: none; width: 100%; height: 300px;"></canvas>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="clear-signature-btn">Clear</button>
@@ -87,10 +88,10 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="{{ url_for('static', path='js/signature.js') }}"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', (event) => {
-    const email = "{{ email }}";
-    const signatureRequestId = "{{ signature_request_id }}";
-    initializeSignaturePage(email, signatureRequestId);
-  });
+    document.addEventListener('DOMContentLoaded', (event) => {
+        const email = "{{ email }}";
+        const signatureRequestId = "{{ signature_request_id }}";
+        initializeSignaturePage(email, signatureRequestId);
+    });
 </script>
 {% endblock %}

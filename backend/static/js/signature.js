@@ -1,6 +1,6 @@
-function initializeSignaturePage(email, signatureRequestId) {
+async function initializeSignaturePage(email, signatureRequestId) {
 	const documentLinks = document.querySelectorAll(".document-link");
-	const pdfFrame = document.getElementById("pdf-frame");
+	const pdfContainer = document.getElementById("pdf-container");
 	const nextDocButton = document.getElementById("next-doc");
 	const prevDocButton = document.getElementById("prev-doc");
 	const drawSignButton = document.getElementById("draw-signature-btn");
@@ -23,45 +23,47 @@ function initializeSignaturePage(email, signatureRequestId) {
 		});
 	});
 
-	function updateDocumentDisplay(index) {
-		pdfFrame.src = documentLinks[index].dataset.url;
+	async function updateDocumentDisplay(index) {
+		const urls = JSON.parse(
+			documentLinks[index].dataset.urls.replace(/'/g, '"'),
+		);
 		currentDocIndex = index;
-		pdfFrame.onload = () => {
-			attachScrollListener(index);
-		};
+		console.log("Loading images for document index:", index, "URLs:", urls);
+		await loadImages(urls);
+		attachScrollListener(index);
 		updateButtonStates();
 	}
 
-	function attachScrollListener(index) {
-		const frameDocument =
-			pdfFrame.contentDocument || pdfFrame.contentWindow.document;
-		if (frameDocument.body) {
-			frameDocument.body.addEventListener(
-				"scroll",
-				() => checkScrollToEnd(index),
-				{ passive: true },
-			);
-		} else {
-			console.error("No body element in iframe");
+	async function loadImages(urls) {
+		pdfContainer.innerHTML = "";
+		for (const url of urls) {
+			const img = document.createElement("img");
+			img.src = url;
+			img.style.width = "100%";
+			img.onload = () => console.log("Loaded image:", url);
+			img.onerror = (err) => console.error("Error loading image:", url, err);
+			pdfContainer.appendChild(img);
 		}
 	}
 
-	function checkScrollToEnd(index) {
-		const frameDocument =
-			pdfFrame.contentDocument || pdfFrame.contentWindow.document;
-		const scrollTop =
-			frameDocument.documentElement.scrollTop || frameDocument.body.scrollTop;
-		const scrollHeight =
-			frameDocument.documentElement.scrollHeight ||
-			frameDocument.body.scrollHeight;
-		const clientHeight =
-			frameDocument.documentElement.clientHeight ||
-			frameDocument.body.clientHeight;
-		const scrolledToEnd = scrollTop + clientHeight >= scrollHeight - 5;
+	function attachScrollListener(index) {
+		console.log(`Attaching scroll listener to document ${index}`);
+		pdfContainer.addEventListener("scroll", () => checkScrollToEnd(index), {
+			passive: true,
+		});
+	}
 
+	function checkScrollToEnd(index) {
+		const scrollTop = pdfContainer.scrollTop;
+		const scrollHeight = pdfContainer.scrollHeight;
+		const clientHeight = pdfContainer.clientHeight;
+		const scrolledToEnd = scrollTop + clientHeight >= scrollHeight - 5;
 		if (scrolledToEnd && !viewedDocs.get(index)) {
+			console.log(`Document ${index} viewed`);
 			viewedDocs.set(index, true);
-			documentLinks[index].innerHTML += " (Read)";
+			documentLinks[index].parentElement.querySelector(
+				".read-status",
+			).textContent = "(Read)";
 			checkAllDocumentsViewed();
 		}
 	}

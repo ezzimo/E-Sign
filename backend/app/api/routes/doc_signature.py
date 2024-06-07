@@ -26,6 +26,7 @@ from app.services.file_service import (
     send_otp_code,
     verify_secure_link_token,
 )
+from app.services.file_utils import convert_pdf_to_images
 from app.utils import send_signature_request_notification_email
 
 templates = Jinja2Templates(directory="signature-templates")
@@ -68,10 +69,21 @@ def access_document_with_token(
                 status_code=404,
                 detail="No Document corresponding to the payload document id",
             )
-        file_path = STATIC_FILES_DIR / f"{document.owner_id}_{document.file}"
-        if not file_path.exists():
-            raise HTTPException(status_code=404, detail="File not found")
-        document_urls.append(f"document_files/{document.owner_id}_{document.file}")
+        folder_name = f"{document.owner_id}_{document.title}"
+        image_folder = STATIC_FILES_DIR / folder_name
+
+        if not image_folder.exists():
+            convert_pdf_to_images(
+                STATIC_FILES_DIR / f"{document.owner_id}_{document.file}", image_folder
+            )
+
+        # Ensure the images are already converted and available
+
+        image_urls = [
+            f"/api/v1/static/document_files/{document.owner_id}_{document.title}/page_{i}.png"
+            for i in range(1, len(list(image_folder.glob("*.png"))) + 1)
+        ]
+        document_urls.append(image_urls)
 
         if document.status != DocumentStatus.VIEWED:
             document.status = DocumentStatus.VIEWED
