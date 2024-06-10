@@ -17,14 +17,26 @@ def create_user(*, session: Session, user_create: UserCreate) -> User:
     return db_obj
 
 
-def update_user(*, session: Session, db_user: User, user_in: UserUpdate) -> Any:
-    user_data = user_in.model_dump(exclude_unset=True)
+def update_user(
+    *, session: Session, db_user: User, user_in: UserUpdate | dict[str, Any]
+) -> User:
+    user_data = (
+        user_in.model_dump(exclude_unset=True)
+        if isinstance(user_in, UserUpdate)
+        else user_in
+    )
     extra_data = {}
     if "password" in user_data:
-        password = user_data["password"]
+        password = user_data.pop("password")
         hashed_password = get_password_hash(password)
         extra_data["hashed_password"] = hashed_password
-    db_user.sqlmodel_update(user_data, update=extra_data)
+
+    for key, value in user_data.items():
+        setattr(db_user, key, value)
+
+    for key, value in extra_data.items():
+        setattr(db_user, key, value)
+
     session.add(db_user)
     session.commit()
     session.refresh(db_user)
@@ -44,3 +56,10 @@ def authenticate(*, session: Session, email: str, password: str) -> User | None:
     if not verify_password(password, db_user.hashed_password):
         return None
     return db_user
+
+
+def delete_user(*, session: Session, user_id: int) -> None:
+    user = session.get(User, user_id)
+    if user:
+        session.delete(user)
+        session.commit()

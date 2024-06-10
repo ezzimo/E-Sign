@@ -1,9 +1,8 @@
 """Initial migration
 
-
-Revision ID: a6018e78b10c
+Revision ID: a9ab5173f15f
 Revises: 
-Create Date: 2024-05-15 18:11:52.290508
+Create Date: 2024-06-10 15:47:19.061750
 
 """
 from alembic import op
@@ -12,7 +11,7 @@ import sqlmodel.sql.sqltypes
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = 'a6018e78b10c'
+revision = 'a9ab5173f15f'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -27,7 +26,7 @@ def upgrade():
     sa.Column('title', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('file', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('file_url', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-    sa.Column('status', sa.Enum('DRAFT', 'SENT_FOR_SIGNATURE', 'SIGNED', 'REJECTED', name='documentstatus'), nullable=False),
+    sa.Column('status', sa.Enum('DRAFT', 'SENT_FOR_SIGNATURE', 'VIEWED', 'SIGNED', 'REJECTED', name='documentstatus'), nullable=False),
     sa.Column('owner_id', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['owner_id'], ['user.id'], ),
     sa.PrimaryKeyConstraint('id')
@@ -92,12 +91,30 @@ def upgrade():
     sa.Column('y', sa.Integer(), nullable=True),
     sa.Column('height', sa.Integer(), nullable=True),
     sa.Column('width', sa.Integer(), nullable=True),
+    sa.Column('optional', sa.Boolean(), nullable=True),
+    sa.Column('mention', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('checked', sa.Boolean(), nullable=True),
     sa.Column('document_id', sa.Integer(), nullable=False),
-    sa.Column('signature_request_id', sa.Integer(), nullable=False),
+    sa.Column('signature_request_id', sa.Integer(), nullable=True),
     sa.Column('signer_id', sa.Integer(), nullable=True),
+    sa.Column('max_length', sa.Integer(), nullable=True),
+    sa.Column('question', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('instruction', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('text', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
     sa.ForeignKeyConstraint(['document_id'], ['document.id'], ),
     sa.ForeignKeyConstraint(['signature_request_id'], ['signaturerequest.id'], ),
     sa.ForeignKeyConstraint(['signer_id'], ['signatory.id'], ),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_table('documentsignaturedetails',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('document_id', sa.Integer(), nullable=False),
+    sa.Column('signed_hash', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('timestamp', sa.DateTime(), nullable=False),
+    sa.Column('certified_timestamp', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('ip_address', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.ForeignKeyConstraint(['document_id'], ['document.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
     op.create_table('remindersettings',
@@ -178,6 +195,7 @@ def downgrade():
     op.drop_table('requestsignatorylink')
     op.drop_table('requestdocumentlink')
     op.drop_table('remindersettings')
+    op.drop_table('documentsignaturedetails')
     op.drop_table('docfield')
     op.drop_table('auditlog')
     op.drop_table('signaturerequest')
