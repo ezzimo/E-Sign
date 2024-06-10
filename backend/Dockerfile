@@ -21,6 +21,8 @@ COPY ./scripts/ /app/
 
 COPY ./alembic.ini /app/
 
+COPY ./logging.conf /app/
+
 COPY ./prestart.sh /app/
 
 COPY ./tests-start.sh /app/

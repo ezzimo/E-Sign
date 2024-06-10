@@ -4,9 +4,33 @@
 /* eslint-disable */
 
 export type UserOut = {
+    /**
+     * User email address
+     */
     email: string;
+    /**
+     * Is user active?
+     */
     is_active?: boolean;
+    /**
+     * Is user a superuser?
+     */
     is_superuser?: boolean;
-    full_name?: (string | null);
+    /**
+     * User's unique ID
+     */
     id: number;
+    /**
+     * User's full name
+     */
+    full_name?: (string | null);
+    /**
+     * Creation timestamp
+     */
+    created_at: string;
+    /**
+     * Last update timestamp
+     */
+    updated_at: string;
 };
+

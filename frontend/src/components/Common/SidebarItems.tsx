@@ -1,30 +1,40 @@
-import { Box, Flex, Icon, Text, useColorModeValue } from "@chakra-ui/react"
-import { Link } from "@tanstack/react-router"
-import type React from "react"
-import { FiBriefcase, FiHome, FiSettings, FiUsers } from "react-icons/fi"
-import { useQueryClient } from "react-query"
+import { Box, Flex, Icon, Text, useColorModeValue } from "@chakra-ui/react";
+import { Link } from "@tanstack/react-router";
+import React from "react";
+import {
+  FiBriefcase,
+  FiFileText,
+  FiHome,
+  FiPlus,
+  FiSettings,
+  FiUsers,
+} from "react-icons/fi";
+import { useQueryClient } from "react-query";
 
-import type { UserOut } from "../../client"
+import type { UserOut } from "../../client";
 
 const items = [
   { icon: FiHome, title: "Dashboard", path: "/" },
   { icon: FiBriefcase, title: "Items", path: "/items" },
+  { icon: FiFileText, title: "Documents", path: "/documents" },
+  { icon: FiFileText, title: "Signature Requests", path: "/signature_requests" }, // List route
+  { icon: FiPlus, title: "New Signature Request", path: "/new_signature_requests" }, // Create route
   { icon: FiSettings, title: "User Settings", path: "/settings" },
-]
+];
 
 interface SidebarItemsProps {
-  onClose?: () => void
+  onClose?: () => void;
 }
 
 const SidebarItems: React.FC<SidebarItemsProps> = ({ onClose }) => {
-  const queryClient = useQueryClient()
-  const textColor = useColorModeValue("ui.main", "ui.white")
-  const bgActive = useColorModeValue("#E2E8F0", "#4A5568")
-  const currentUser = queryClient.getQueryData<UserOut>("currentUser")
+  const queryClient = useQueryClient();
+  const textColor = useColorModeValue("ui.main", "ui.white");
+  const bgActive = useColorModeValue("#E2E8F0", "#4A5568");
+  const currentUser = queryClient.getQueryData<UserOut>("currentUser");
 
   const finalItems = currentUser?.is_superuser
     ? [...items, { icon: FiUsers, title: "Admin", path: "/admin" }]
-    : items
+    : items;
 
   const listItems = finalItems.map((item) => (
     <Flex
@@ -45,13 +55,13 @@ const SidebarItems: React.FC<SidebarItemsProps> = ({ onClose }) => {
       <Icon as={item.icon} alignSelf="center" />
       <Text ml={2}>{item.title}</Text>
     </Flex>
-  ))
+  ));
 
   return (
     <>
       <Box>{listItems}</Box>
     </>
-  )
-}
+  );
+};
 
-export default SidebarItems
+export default SidebarItems;

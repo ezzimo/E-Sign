@@ -5,34 +5,45 @@
 export const $UserUpdate = {
     properties: {
         email: {
-    type: 'any-of',
-    contains: [{
-    type: 'string',
-}, {
-    type: 'null',
-}],
-},
+            type: 'string',
+            description: `User email address`,
+            isRequired: true,
+            format: 'email',
+        },
         is_active: {
-    type: 'boolean',
-},
+            type: 'boolean',
+            description: `Is user active?`,
+        },
         is_superuser: {
-    type: 'boolean',
-},
+            type: 'boolean',
+            description: `Is user a superuser?`,
+        },
         full_name: {
-    type: 'any-of',
-    contains: [{
-    type: 'string',
-}, {
-    type: 'null',
-}],
-},
-        password: {
-    type: 'any-of',
-    contains: [{
-    type: 'string',
-}, {
-    type: 'null',
-}],
-},
+            type: 'any-of',
+            description: `User's full name`,
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
+        company: {
+            type: 'any-of',
+            description: `User's company`,
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
+        role: {
+            type: 'any-of',
+            description: `User's role`,
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
     },
 } as const;

@@ -4,21 +4,51 @@
 /* eslint-disable */
 export const $UserUpdateMe = {
     properties: {
-        full_name: {
-    type: 'any-of',
-    contains: [{
-    type: 'string',
-}, {
-    type: 'null',
-}],
-},
         email: {
-    type: 'any-of',
-    contains: [{
-    type: 'string',
-}, {
-    type: 'null',
-}],
-},
+            type: 'any-of',
+            description: `User email`,
+            contains: [{
+                type: 'string',
+                format: 'email',
+            }, {
+                type: 'null',
+            }],
+        },
+        full_name: {
+            type: 'any-of',
+            description: `User's full name`,
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
+        first_name: {
+            type: 'any-of',
+            description: `User's first name`,
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
+        last_name: {
+            type: 'any-of',
+            description: `User's last name`,
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
+        company: {
+            type: 'any-of',
+            description: `User's company`,
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
     },
 } as const;

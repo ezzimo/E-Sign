@@ -1,8 +1,15 @@
 import os
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
+
+from app.models.models import (  # noqa
+    User, Document, DocField, Radio, Signatory, ReminderSettings, SignatureRequest,
+    RequestDocumentLink, RequestSignatoryLink, AuditLog, Item
+)
+from app.models.models import SQLModel
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -10,15 +17,13 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+fileConfig("logging.conf", disable_existing_loggers=False)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 # target_metadata = None
-
-from app.models import SQLModel  # noqa
 
 target_metadata = SQLModel.metadata
 

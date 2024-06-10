@@ -5,26 +5,44 @@
 export const $UserOut = {
     properties: {
         email: {
-    type: 'string',
-    isRequired: true,
-},
+            type: 'string',
+            description: `User email address`,
+            isRequired: true,
+            format: 'email',
+        },
         is_active: {
-    type: 'boolean',
-},
+            type: 'boolean',
+            description: `Is user active?`,
+        },
         is_superuser: {
-    type: 'boolean',
-},
-        full_name: {
-    type: 'any-of',
-    contains: [{
-    type: 'string',
-}, {
-    type: 'null',
-}],
-},
+            type: 'boolean',
+            description: `Is user a superuser?`,
+        },
         id: {
-    type: 'number',
-    isRequired: true,
-},
+            type: 'number',
+            description: `User's unique ID`,
+            isRequired: true,
+        },
+        full_name: {
+            type: 'any-of',
+            description: `User's full name`,
+            contains: [{
+                type: 'string',
+            }, {
+                type: 'null',
+            }],
+        },
+        created_at: {
+            type: 'string',
+            description: `Creation timestamp`,
+            isRequired: true,
+            format: 'date-time',
+        },
+        updated_at: {
+            type: 'string',
+            description: `Last update timestamp`,
+            isRequired: true,
+            format: 'date-time',
+        },
     },
 } as const;
