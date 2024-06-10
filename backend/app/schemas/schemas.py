@@ -133,6 +133,9 @@ class DocumentSignatureDetailsBase(BaseModel):
     certified_timestamp: Optional[str] = Field(None, description="Certified timestamp if available")
     ip_address: Optional[str] = Field(None, description="IP address of the signer")
 
+    class Config:
+        from_attributes = True
+
 
 class DocumentSignatureDetailsCreate(DocumentSignatureDetailsBase):
     pass
@@ -140,7 +143,6 @@ class DocumentSignatureDetailsCreate(DocumentSignatureDetailsBase):
 
 class DocumentSignatureDetailsOut(DocumentSignatureDetailsBase):
     id: int
-    document_id: int
 
 
 class DocumentOut(DocumentBase):

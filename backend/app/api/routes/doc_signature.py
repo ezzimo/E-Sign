@@ -157,7 +157,7 @@ def send_otp(
     return JSONResponse(content={"message": "OTP sent successfully"})
 
 
-@router.post("/verify_otp", response_class=HTMLResponse)
+@router.post("/verify_otp", response_class=JSONResponse)
 def verify_otp(
     request: Request,
     session: SessionDep,
@@ -165,7 +165,6 @@ def verify_otp(
     otp: int = Form(...),
     signature_request_id: int = Form(...),
 ):
-    # Example OTP store check
     if email not in otp_store:
         raise HTTPException(status_code=400, detail="OTP not found")
     otp_data = otp_store[email]
@@ -176,7 +175,6 @@ def verify_otp(
         raise HTTPException(status_code=400, detail="Invalid OTP")
     del otp_store[email]
 
-    # Log the OTP verification
     audit_log_crud.create_audit_log(
         session,
         AuditLogCreate(
@@ -187,7 +185,6 @@ def verify_otp(
         ),
     )
 
-    # Process the signature request
     signature_request = session.get(SignatureRequest, signature_request_id)
     if not signature_request:
         raise HTTPException(status_code=404, detail="Signature request not found")
@@ -195,12 +192,10 @@ def verify_otp(
     signature_request.status = SignatureRequestStatus.COMPLETED
     session.commit()
 
-    # Process each document associated with the signature request
     for document in signature_request.documents:
         document.status = DocumentStatus.SIGNED
         session.commit()
 
-        # Additional processing: adding fields to PDF and securing it
         final_pdf_path = (
             STATIC_FILES_DIR
             / "signed_documents"
@@ -217,7 +212,6 @@ def verify_otp(
         pdf_hash = generate_pdf_hash(str(final_pdf_path))
         logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
 
-        # Create and store the document signature details
         document_signature_details = DocumentSignatureDetailsCreate(
             document_id=document.id,
             signed_hash=pdf_hash,
@@ -228,7 +222,6 @@ def verify_otp(
             session, document_signature_details
         )
 
-    # Notify all related parties via email
     signed_documents = [final_pdf_path for document in signature_request.documents]
     recipients = [signature_request.sender.email] + [
         signatory.email for signatory in signature_request.signatories
@@ -242,7 +235,12 @@ def verify_otp(
             documents=signed_documents,
         )
 
+    return JSONResponse(content={"message": "Document successfully signed!"})
+
+
+@router.get("/success", response_class=HTMLResponse)
+def signature_success(request: Request):
     return templates.TemplateResponse(
         "main_pages/signature_success.html",
-        {"request": request, "message": "Document successfully signed!"},
+        {"request": request, "message": "Document successfully signed!"}
     )

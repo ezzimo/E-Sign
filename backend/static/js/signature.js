@@ -134,35 +134,37 @@ async function initializeSignaturePage(email, signatureRequestId) {
 			});
 	}
 
-	function verifyOtp() {
-		verifyOtpBtn.disabled = true;
-		fetch("/api/v1/signe/verify_otp", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/x-www-form-urlencoded",
-			},
-			body: new URLSearchParams({
-				email: emailInput.value,
-				otp: otpInput.value,
-				signature_request_id: signatureRequestId,
-			}),
-		})
-			.then((response) => {
-				verifyOtpBtn.disabled = false;
-				if (response.ok) {
-					alert("Document signed successfully");
-					$("#otpModal").modal("hide");
-					resetModal();
-					window.location.href = "/api/v1/signe/verify_otp"; // Redirect to the success page
-				} else {
-					alert("Failed to verify OTP");
-				}
-			})
-			.catch((error) => {
-				alert("Error verifying OTP: " + error.message);
-				verifyOtpBtn.disabled = false;
-			});
-	}
+	async function verifyOtp() {
+        verifyOtpBtn.disabled = true;
+        try {
+            const response = await fetch("/api/v1/signe/verify_otp", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                    email: emailInput.value,
+                    otp: otpInput.value,
+                    signature_request_id: signatureRequestId,
+                }),
+            });
+
+            verifyOtpBtn.disabled = false;
+            if (response.ok) {
+                const data = await response.json();
+                alert(data.message);
+                $("#otpModal").modal("hide");
+                resetModal();
+                window.location.href = "/api/v1/signe/success"; // Redirect to the success page
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to verify OTP: ${errorData.detail}`);
+            }
+        } catch (error) {
+            alert(`Error verifying OTP: ${error.message}`);
+            verifyOtpBtn.disabled = false;
+        }
+    }
 
 	function resetModal() {
 		otpInput.value = "";

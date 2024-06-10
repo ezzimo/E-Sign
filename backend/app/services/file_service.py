@@ -134,7 +134,7 @@ def draw_signature_field(c, field, signatory):
         c.setFillColor(black)
         c.drawString(field.x, field.y,
                      f"{signatory.first_name} {signatory.last_name}")
-    c.rect(field.x, field.y - 10, field.width, field.height)
+    # c.rect(field.x, field.y - 10, field.width, field.height)
 
 
 def draw_text_field(c, field):
