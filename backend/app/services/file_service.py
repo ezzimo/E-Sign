@@ -27,10 +27,18 @@ logger = logging.getLogger(__name__)
 UPLOAD_DIR = Path("/app/static/document_files")
 
 
+def generate_unique_filename(user_id: int, original_filename: str) -> str:
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    file_extension = Path(original_filename).suffix
+    unique_filename = f"{user_id}_{timestamp}_{random_string}{file_extension}"
+    return unique_filename
+
+
 def save_file(file: UploadFile, user_id: int) -> str:
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    new_filename = f"{user_id}_{file.filename}"
-    save_path = UPLOAD_DIR / new_filename
+    unique_filename = generate_unique_filename(user_id, file.filename)
+    save_path = UPLOAD_DIR / unique_filename
     with open(save_path, "wb") as f:
         f.write(file.file.read())
     return str(save_path)
@@ -75,6 +83,7 @@ def generate_secure_link(
     email: str,
     document_ids: List[int],
     signatory_id: int,
+    require_otp: bool,
 ) -> str:
     expiration = expiry_date
     payload = {
@@ -83,6 +92,7 @@ def generate_secure_link(
         "exp": expiration,
         "document_ids": document_ids,
         "signatory_id": signatory_id,
+        "require_otp": require_otp,
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
     secure_link = f"{settings.FRONTEND_URL}/api/v1/signe/sign_document?token={token}"

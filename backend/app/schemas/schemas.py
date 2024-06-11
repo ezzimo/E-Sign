@@ -294,6 +294,7 @@ class SignatureRequestBase(BaseModel):
     name: str
     delivery_mode: str
     ordered_signers: bool
+    require_otp: bool = True
     reminder_settings: ReminderSettingsSchema | None = None
     expiry_date: datetime | None = None
     message: str | None = None

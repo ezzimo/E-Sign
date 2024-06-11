@@ -135,36 +135,36 @@ async function initializeSignaturePage(email, signatureRequestId) {
 	}
 
 	async function verifyOtp() {
-        verifyOtpBtn.disabled = true;
-        try {
-            const response = await fetch("/api/v1/signe/verify_otp", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({
-                    email: emailInput.value,
-                    otp: otpInput.value,
-                    signature_request_id: signatureRequestId,
-                }),
-            });
+		verifyOtpBtn.disabled = true;
+		try {
+			const response = await fetch("/api/v1/signe/verify_otp", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/x-www-form-urlencoded",
+				},
+				body: new URLSearchParams({
+					email: emailInput.value,
+					otp: otpInput.value,
+					signature_request_id: signatureRequestId,
+				}),
+			});
 
-            verifyOtpBtn.disabled = false;
-            if (response.ok) {
-                const data = await response.json();
-                alert(data.message);
-                $("#otpModal").modal("hide");
-                resetModal();
-                window.location.href = "/api/v1/signe/success"; // Redirect to the success page
-            } else {
-                const errorData = await response.json();
-                alert(`Failed to verify OTP: ${errorData.detail}`);
-            }
-        } catch (error) {
-            alert(`Error verifying OTP: ${error.message}`);
-            verifyOtpBtn.disabled = false;
-        }
-    }
+			verifyOtpBtn.disabled = false;
+			if (response.ok) {
+				const data = await response.json();
+				alert(data.message);
+				$("#otpModal").modal("hide");
+				resetModal();
+				window.location.href = "/api/v1/signe/success"; // Redirect to the success page
+			} else {
+				const errorData = await response.json();
+				alert(`Failed to verify OTP: ${errorData.detail}`);
+			}
+		} catch (error) {
+			alert(`Error verifying OTP: ${error.message}`);
+			verifyOtpBtn.disabled = false;
+		}
+	}
 
 	function resetModal() {
 		otpInput.value = "";
@@ -202,10 +202,33 @@ async function initializeSignaturePage(email, signatureRequestId) {
 		);
 	};
 
-	saveButton.onclick = () => {
+	saveButton.onclick = async () => {
 		const signatureData = signaturePad.canvas.toDataURL("image/png");
 		console.log("Signature Data:", signatureData);
-		signatureModal.modal("hide");
+
+		try {
+			const response = await fetch("/api/v1/signe/save_signature", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					email: emailInput.value,
+					signature_request_id: signatureRequestId,
+					signature_image: signatureData,
+				}),
+			});
+
+			if (response.ok) {
+				alert("Signature saved successfully");
+				signatureModal.modal("hide");
+			} else {
+				const errorData = await response.json();
+				alert(`Failed to save signature: ${errorData.detail}`);
+			}
+		} catch (error) {
+			alert(`Error saving signature: ${error.message}`);
+		}
 	};
 
 	function startDrawing(e) {

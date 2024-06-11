@@ -2,16 +2,14 @@ from sqlmodel import Session, select
 from fastapi import HTTPException
 from app.models.models import Document, User
 from app.schemas.schemas import DocumentCreate, DocumentUpdate
-from app.services.file_utils import generate_file_url
 
 
 def create_document(db: Session, *, obj_in: DocumentCreate) -> Document:
-    file_url = generate_file_url(obj_in.file)
     db_obj = Document(
         title=obj_in.title,
         status=obj_in.status,
         file=obj_in.file,
-        file_url=file_url,
+        file_url=obj_in.file_url,
         owner_id=obj_in.owner_id,
     )
     db.add(db_obj)
@@ -27,7 +25,7 @@ def update_document(db: Session, *, db_obj: Document, obj_in: DocumentUpdate) ->
         db_obj.status = obj_in.status
     if obj_in.file is not None:
         db_obj.file = obj_in.file
-        db_obj.file_url = generate_file_url(obj_in.file)
+        db_obj.file_url = obj_in.file_url
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)

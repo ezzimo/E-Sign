@@ -31,7 +31,7 @@ async def create_document(
     document_in = DocumentCreate(
         title=title,
         status=status,
-        file=file.filename,
+        file=Path(file_location).name,
         owner_id=current_user.id,
         file_url=str(file_location),
     )
@@ -147,8 +147,8 @@ async def update_document(
         document_in = DocumentUpdate(
             title=title,
             status=status,
-            file=new_file.filename,
-            file_url=file_location,
+            file=Path(file_location).name,
+            file_url=str(file_location),
         )
     else:
         document_in = DocumentUpdate(

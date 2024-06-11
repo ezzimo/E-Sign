@@ -1,15 +1,16 @@
 import logging
 import random
+import base64
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
 from app.api.deps import SessionDep
-from app.crud import audit_log_crud, signed_document_crud
+from app.crud import audit_log_crud, signed_document_crud, signatory_crud
 from app.models.models import (
     AuditLogAction,
     Document,
@@ -18,7 +19,7 @@ from app.models.models import (
     SignatureRequest,
     SignatureRequestStatus,
 )
-from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate
+from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate, SignatoryUpdate
 from app.services.file_service import (
     add_fields_to_pdf,
     apply_pdf_security,
@@ -32,6 +33,9 @@ from app.utils import send_signature_request_notification_email
 templates = Jinja2Templates(directory="signature-templates")
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+SIGNATURES_DIR = Path("/app/static/signatures")
+SIGNATURES_DIR.mkdir(parents=True, exist_ok=True)
 
 otp_store = {}
 STATIC_FILES_DIR = Path("/app/static/document_files")
@@ -49,6 +53,8 @@ def access_document_with_token(
     email = payload.get("sub")
     signatory_id = payload.get("signatory_id")
     signature_request_id = payload.get("signature_request_id")
+    require_otp = payload.get("require_otp")
+
     if document_ids is None:
         raise HTTPException(status_code=400, detail="No document id in the payload")
     if email is None:
@@ -59,6 +65,22 @@ def access_document_with_token(
         raise HTTPException(
             status_code=400, detail="No signature_request id in the payload"
         )
+    if require_otp is None:
+        raise HTTPException(status_code=400, detail="No require_otp id in the payload")
+
+    signature_request_statement = select(SignatureRequest).where(
+        SignatureRequest.id == int(signature_request_id)
+    )
+    signature_request = session.exec(signature_request_statement).first()
+    if not signature_request:
+        raise HTTPException(
+            status_code=404, detail="Signature request not found"
+        )
+    if signature_request.status in [SignatureRequestStatus.COMPLETED, SignatureRequestStatus.CANCELED]:
+        if signature_request.status == SignatureRequestStatus.COMPLETED:
+            return RedirectResponse(url="/signature_completed")
+        elif signature_request.status == SignatureRequestStatus.CANCELED:
+            return RedirectResponse(url="/signature_canceled")
 
     document_urls = []
     for document_id in document_ids:
@@ -101,11 +123,6 @@ def access_document_with_token(
             ),
         )
 
-        signature_request_statement = select(SignatureRequest).where(
-            SignatureRequest.id == int(signature_request_id)
-        )
-        signature_request = session.exec(signature_request_statement).first()
-        # Send notification email
         send_signature_request_notification_email(
             signature_request.sender.email,
             signature_request.name,
@@ -126,6 +143,7 @@ def access_document_with_token(
             "email": signatory.email,
             "phone_number": signatory.phone_number,
             "signature_request_id": signature_request_id,
+            "require_otp": require_otp,
         },
     )
 
@@ -244,3 +262,40 @@ def signature_success(request: Request):
         "main_pages/signature_success.html",
         {"request": request, "message": "Document successfully signed!"}
     )
+
+
+@router.post("/save_signature", response_class=JSONResponse)
+def save_signature(
+    request: Request,
+    session: SessionDep,
+    email: str = Form(...),
+    signature_request_id: int = Form(...),
+    signature_image: str = Form(...),
+):
+    signatory = session.exec(select(Signatory).where(Signatory.email == email)).first()
+    if not signatory:
+        raise HTTPException(status_code=404, detail="Signatory not found")
+
+    # Decode the base64 image
+    image_data = base64.b64decode(signature_image.split(",")[1])
+    signature_path = SIGNATURES_DIR / f"{signatory.id}.png"
+
+    # Save the image
+    with open(signature_path, "wb") as f:
+        f.write(image_data)
+
+    # Update the signatory with the path to the signature image
+    signatory_update = SignatoryUpdate(signature_image=str(signature_path))
+    signatory_crud.update_signatory(session, signatory.id, signatory_update)
+
+    return JSONResponse(content={"message": "Signature saved successfully"})
+
+
+@router.get("/signature_completed", response_class=HTMLResponse)
+def signature_completed(request: Request):
+    return templates.TemplateResponse("main_pages/signature_completed.html", {"request": request})
+
+
+@router.get("/signature_canceled", response_class=HTMLResponse)
+def signature_canceled(request: Request):
+    return templates.TemplateResponse("main_pages/signature_canceled.html", {"request": request})

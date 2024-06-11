@@ -26,6 +26,7 @@ def create_signature_request(
         message=request_data.message,
         expiry_date=request_data.expiry_date,
         sender_id=sender_id,
+        require_otp=request_data.require_otp,
     )
     db.add(signature_request)
     db.commit()

@@ -201,6 +201,7 @@ class SignatureRequest(BaseModel, table=True):
     expiry_date: Optional[datetime] = None
     ordered_signers: bool = Field(default=False)
     sender_id: int = Field(foreign_key="user.id")
+    require_otp: bool = Field(default=True)
 
     sender: User = Relationship()
     documents: List[Document] = Relationship(

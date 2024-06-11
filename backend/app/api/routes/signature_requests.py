@@ -95,6 +95,7 @@ def initiate_signature_request(
             signatory.email,
             [document.id for document in signature_request_data.documents],
             signatory.id,
+            signature_request_data.require_otp,
         )
         email_response = send_signature_request_email(
             email_to=signatory.email,
@@ -111,6 +112,7 @@ def initiate_signature_request(
             first_signatory.email,
             [document.id for document in signature_request_data.documents],
             first_signatory.id,
+            signature_request_data.require_otp,
         )
         email_response = send_signature_request_email(
             email_to=first_signatory.email,
