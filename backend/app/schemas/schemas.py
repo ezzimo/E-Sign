@@ -1,14 +1,14 @@
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, validator, ValidationError
-from typing import Optional, List
 
-from ..models.models import ( # noqa
-    UserBase,
+from pydantic import BaseModel, EmailStr, Field, ValidationError, validator
+
+from ..models.models import (  # noqa
     AuditLogAction,
-    DocumentStatus,
     DocumentSignatureDetails,
+    DocumentStatus,
     FieldType,
     SignatureRequestStatus,
+    UserBase,
 )
 
 
@@ -86,6 +86,9 @@ class UserUpdateMe(BaseModel):
     last_name: str | None = Field(None, description="User's last name")
     company: str | None = Field(None, description="User's company")
 
+    class Config:
+        from_attributes = True
+
 
 # Schema for updating a user's password
 class UpdatePassword(BaseModel):
@@ -103,7 +106,7 @@ class UpdatePassword(BaseModel):
 class DocumentBase(BaseModel):
     title: str = Field(..., description="Title of the document")
     file: str = Field(..., description="File path or identifier")
-    file_url: Optional[str] = Field(None, description="URL to view the document")
+    file_url: str | None = Field(None, description="URL to view the document")
     status: DocumentStatus = Field(..., description="Current status of the document")
 
     class Config:
@@ -111,16 +114,16 @@ class DocumentBase(BaseModel):
 
 
 class DocumentCreate(DocumentBase):
-    owner_id: Optional[int] = Field(None, description="Owner ID of the document")
+    owner_id: int | None = Field(None, description="Owner ID of the document")
 
 
 class DocumentUpdate(BaseModel):
-    title: Optional[str] = Field(None, description="New title for the document")
-    status: Optional[DocumentStatus] = Field(
+    title: str | None = Field(None, description="New title for the document")
+    status: DocumentStatus | None = Field(
         None, description="New status of the document"
     )
-    file: Optional[str] = Field(None, description="Updated file for the document")
-    file_url: Optional[str] = Field(None, description="URL to view the document")
+    file: str | None = Field(None, description="Updated file for the document")
+    file_url: str | None = Field(None, description="URL to view the document")
 
     class Config:
         from_attributes = True
@@ -129,9 +132,13 @@ class DocumentUpdate(BaseModel):
 class DocumentSignatureDetailsBase(BaseModel):
     document_id: int = Field(..., description="The document's unique identifier")
     signed_hash: str = Field(..., description="SHA-256 hash of the signed document")
-    timestamp: datetime = Field(..., description="The time when the document was signed")
-    certified_timestamp: Optional[str] = Field(None, description="Certified timestamp if available")
-    ip_address: Optional[str] = Field(None, description="IP address of the signer")
+    timestamp: datetime = Field(
+        ..., description="The time when the document was signed"
+    )
+    certified_timestamp: str | None = Field(
+        None, description="Certified timestamp if available"
+    )
+    ip_address: str | None = Field(None, description="IP address of the signer")
 
     class Config:
         from_attributes = True
@@ -154,9 +161,9 @@ class DocumentOut(DocumentBase):
         ..., description="Timestamp when the document was last updated"
     )
     owner: UserOut = Field(..., description="User information of the owner")
-    signature_details: Optional[DocumentSignatureDetailsOut] = None
+    signature_details: DocumentSignatureDetailsOut | None = None
 
-    @validator('file_url')
+    @validator("file_url")
     def validate_file_url(cls, value):
         # TODO Perform validation or sanitization
         return value
@@ -253,7 +260,7 @@ class SignatoryBase(BaseModel):
 
 
 class SignatoryCreate(SignatoryBase):
-    fields: List[FieldCreate] = Field(..., description="Fields for this signatory")
+    fields: list[FieldCreate] = Field(..., description="Fields for this signatory")
 
 
 class SignatoryUpdate(SignatoryBase):
@@ -271,7 +278,7 @@ class SignatoryOut(SignatoryBase):
     created_at: datetime = Field(..., description="Creation time")
     updated_at: datetime = Field(..., description="Last update time")
     signed_at: datetime | None = None
-    fields: List[FieldCreate] = Field(..., description="Fields for this signatory")
+    fields: list[FieldCreate] = Field(..., description="Fields for this signatory")
 
 
 class ReminderSettingsSchema(BaseModel):
@@ -287,17 +294,17 @@ class SignatureRequestBase(BaseModel):
     name: str
     delivery_mode: str
     ordered_signers: bool
-    reminder_settings: Optional[ReminderSettingsSchema] = None
-    expiry_date: Optional[datetime] = None
-    message: Optional[str] = None
+    reminder_settings: ReminderSettingsSchema | None = None
+    expiry_date: datetime | None = None
+    message: str | None = None
 
     class Config:
         from_attributes = True
 
 
 class SignatureRequestCreate(SignatureRequestBase):
-    signatories: List["SignatoryData"]
-    documents: List[int]
+    signatories: list["SignatoryData"]
+    documents: list[int]
 
     class Config:
         from_attributes = True
@@ -309,22 +316,22 @@ class SignatureRequestRead(SignatureRequestBase):
     sender_id: int
     created_at: datetime
     updated_at: datetime
-    documents: List[DocumentOut]
-    signatories: List[SignatoryOut]
+    documents: list[DocumentOut]
+    signatories: list[SignatoryOut]
 
     class Config:
         from_attributes = True
 
 
 class SignatureRequestUpdate(BaseModel):
-    name: Optional[str] = None
-    delivery_mode: Optional[str] = None
-    ordered_signers: Optional[bool] = None
-    reminder_settings: Optional[ReminderSettingsSchema] = None
-    expiry_date: Optional[datetime] = None
-    message: Optional[str] = None
-    signatories: Optional[List["SignatoryData"]] = None
-    documents: Optional[List[int]] = None
+    name: str | None = None
+    delivery_mode: str | None = None
+    ordered_signers: bool | None = None
+    reminder_settings: ReminderSettingsSchema | None = None
+    expiry_date: datetime | None = None
+    message: str | None = None
+    signatories: list["SignatoryData"] | None = None
+    documents: list[int] | None = None
 
     class Config:
         from_attributes = True
@@ -332,17 +339,17 @@ class SignatureRequestUpdate(BaseModel):
 
 class SignatoryData(BaseModel):
     info: SignatoryBase
-    fields: List["FieldCreate"]
+    fields: list["FieldCreate"]
 
     class Config:
         from_attributes = True
 
 
 class AuditLogBase(BaseModel):
-    description: Optional[str]
-    ip_address: Optional[str]
+    description: str | None
+    ip_address: str | None
     action: AuditLogAction
-    signature_request_id: Optional[int]
+    signature_request_id: int | None
 
     class Config:
         from_attributes = True

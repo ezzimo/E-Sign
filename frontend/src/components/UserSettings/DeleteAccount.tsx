@@ -6,11 +6,15 @@ import {
 	useDisclosure,
 } from "@chakra-ui/react";
 import type React from "react";
+import { useQueryClient } from "react-query";
+import { UserOut } from "../../client"; // Ensure you import UserOut type
 
 import DeleteConfirmation from "./DeleteConfirmation";
 
 const DeleteAccount: React.FC = () => {
 	const confirmationModal = useDisclosure();
+	const queryClient = useQueryClient();
+	const currentUser = queryClient.getQueryData<UserOut>("currentUser");
 
 	return (
 		<>
@@ -25,10 +29,13 @@ const DeleteAccount: React.FC = () => {
 				<Button variant="danger" mt={4} onClick={confirmationModal.onOpen}>
 					Delete
 				</Button>
-				<DeleteConfirmation
-					isOpen={confirmationModal.isOpen}
-					onClose={confirmationModal.onClose}
-				/>
+				{currentUser && (
+					<DeleteConfirmation
+						isOpen={confirmationModal.isOpen}
+						onClose={confirmationModal.onClose}
+						userId={currentUser.id} // Pass the current user ID here
+					/>
+				)}
 			</Container>
 		</>
 	);

@@ -8,8 +8,7 @@ from app.api.deps import CurrentUser, SessionDep, get_current_active_superuser
 from app.core.config import settings
 from app.core.security import get_password_hash, verify_password
 from app.crud import user_crud
-from app.models.models import Message
-from app.models.models import User
+from app.models.models import Message, User
 from app.schemas.schemas import (
     UpdatePassword,
     UserCreate,
@@ -114,10 +113,15 @@ def update_user_me(
                 raise HTTPException(
                     status_code=409, detail="User with this email already exists"
                 )
-        user_data = user_in.dict(exclude_unset=True)
-        user_crud.update_user(session=session, db_user=current_user, user_in=user_data)
+
+        # Use the model_dump method correctly
+        user_data = user_in.model_dump(exclude_unset=True)
+
+        updated_user = user_crud.update_user(
+            session=session, db_user=current_user, user_in=user_data
+        )
         logger.info(f"User {current_user.id}'s information updated successfully.")
-        return current_user
+        return updated_user
     except HTTPException:
         raise
     except Exception as e:

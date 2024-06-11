@@ -11,17 +11,11 @@ import {
 	Text,
 	useColorModeValue,
 } from "@chakra-ui/react";
-import type React from "react";
-import { useState } from "react";
-import { type SubmitHandler, useForm } from "react-hook-form";
+import React, { useState } from "react";
+import { SubmitHandler, useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "react-query";
 
-import {
-	type ApiError,
-	type UserOut,
-	type UserUpdateMe,
-	UsersService,
-} from "../../client";
+import { type ApiError, type UserUpdateMe, UsersService } from "../../client";
 import useAuth from "../../hooks/useAuth";
 import useCustomToast from "../../hooks/useCustomToast";
 
@@ -37,7 +31,7 @@ const UserInformation: React.FC = () => {
 		reset,
 		getValues,
 		formState: { isSubmitting, errors, isDirty },
-	} = useForm<UserOut>({
+	} = useForm<UserUpdateMe>({
 		mode: "onBlur",
 		criteriaMode: "all",
 		defaultValues: {
@@ -57,14 +51,13 @@ const UserInformation: React.FC = () => {
 	const mutation = useMutation(updateInfo, {
 		onSuccess: () => {
 			showToast("Success!", "User updated successfully.", "success");
+			queryClient.invalidateQueries("users");
+			queryClient.invalidateQueries("currentUser");
+			setEditMode(false);
 		},
 		onError: (err: ApiError) => {
 			const errDetail = err.body?.detail;
 			showToast("Something went wrong.", `${errDetail}`, "error");
-		},
-		onSettled: () => {
-			queryClient.invalidateQueries("users");
-			queryClient.invalidateQueries("currentUser");
 		},
 	});
 
@@ -84,7 +77,7 @@ const UserInformation: React.FC = () => {
 					User Information
 				</Heading>
 				<Box w={{ sm: "full", md: "50%" }}>
-					<FormControl>
+					<FormControl isInvalid={!!errors.full_name}>
 						<FormLabel color={color} htmlFor="name">
 							Full name
 						</FormLabel>
@@ -103,6 +96,9 @@ const UserInformation: React.FC = () => {
 							>
 								{currentUser?.full_name || "N/A"}
 							</Text>
+						)}
+						{errors.full_name && (
+							<FormErrorMessage>{errors.full_name.message}</FormErrorMessage>
 						)}
 					</FormControl>
 					<FormControl mt={4} isInvalid={!!errors.email}>
