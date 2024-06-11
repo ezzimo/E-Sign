@@ -33,7 +33,7 @@ def upgrade():
         sa.Column("first_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("last_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("company", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("role", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("role", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
