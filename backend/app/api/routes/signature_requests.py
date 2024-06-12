@@ -106,7 +106,7 @@ def initiate_signature_request(
     else:
         signature_request_data.signatories.sort(key=lambda s: s.signing_order)
         first_signatory = signature_request_data.signatories[0]
-        secure_link = generate_secure_link(
+        secure_link, token = generate_secure_link(
             signature_request_data.expiry_date,
             signature_request_data.id,
             first_signatory.email,
@@ -131,6 +131,7 @@ def initiate_signature_request(
 
         # Update signature request status
         signature_request_data.status = SignatureRequestStatus.SENT
+        signature_request_data.token = token
         db.add(signature_request_data)
         db.commit()
         db.refresh(signature_request_data)
@@ -211,6 +212,7 @@ def initiate_signature_request(
         ),
         expiry_date=signature_request_data.expiry_date,
         message=signature_request_data.message,
+        token=signature_request_data.token,
         documents=[DocumentOut.model_validate(doc) for doc in documents],
         signatories=[SignatoryOut.model_validate(sig) for sig in signatories],
     )

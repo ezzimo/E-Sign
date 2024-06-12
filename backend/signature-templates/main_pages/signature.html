@@ -90,7 +90,8 @@
     document.addEventListener('DOMContentLoaded', (event) => {
         const email = "{{ email }}";
         const signatureRequestId = "{{ signature_request_id }}";
-        initializeSignaturePage(email, signatureRequestId);
+        const requireOtp = "{{ require_otp|tojson }}";
+        initializeSignaturePage(email, signatureRequestId, requireOtp);
     });
 </script>
 {% endblock %}

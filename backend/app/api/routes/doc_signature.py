@@ -3,6 +3,7 @@ import random
 import base64
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -78,9 +79,9 @@ def access_document_with_token(
         )
     if signature_request.status in [SignatureRequestStatus.COMPLETED, SignatureRequestStatus.CANCELED]:
         if signature_request.status == SignatureRequestStatus.COMPLETED:
-            return RedirectResponse(url="/signature_completed")
+            return RedirectResponse(url="/api/v1/signe/signature_completed")
         elif signature_request.status == SignatureRequestStatus.CANCELED:
-            return RedirectResponse(url="/signature_canceled")
+            return RedirectResponse(url="/api/v1/signe/signature_canceled")
 
     document_urls = []
     for document_id in document_ids:
@@ -96,7 +97,7 @@ def access_document_with_token(
 
         if not image_folder.exists():
             convert_pdf_to_images(
-                STATIC_FILES_DIR / f"{document.owner_id}_{document.file}", image_folder
+                STATIC_FILES_DIR / f"{document.file}", image_folder
             )
 
         # Ensure the images are already converted and available
@@ -180,32 +181,33 @@ def verify_otp(
     request: Request,
     session: SessionDep,
     email: str = Form(...),
-    otp: int = Form(...),
+    otp: Optional[int] = Form(None),
     signature_request_id: int = Form(...),
 ):
-    if email not in otp_store:
-        raise HTTPException(status_code=400, detail="OTP not found")
-    otp_data = otp_store[email]
-    if otp_data["expires"] < datetime.now():
-        del otp_store[email]
-        raise HTTPException(status_code=400, detail="OTP expired")
-    if otp_data["otp"] != otp:
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-    del otp_store[email]
-
-    audit_log_crud.create_audit_log(
-        session,
-        AuditLogCreate(
-            description="OTP verified",
-            ip_address=request.client.host,
-            action=AuditLogAction.DOCUMENT_SIGNED,
-            signature_request_id=signature_request_id,
-        ),
-    )
-
     signature_request = session.get(SignatureRequest, signature_request_id)
     if not signature_request:
         raise HTTPException(status_code=404, detail="Signature request not found")
+
+    if signature_request.require_otp:
+        if email not in otp_store:
+            raise HTTPException(status_code=400, detail="OTP not found")
+        otp_data = otp_store[email]
+        if otp_data["expires"] < datetime.now():
+            del otp_store[email]
+            raise HTTPException(status_code=400, detail="OTP expired")
+        if otp_data["otp"] != otp:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+        del otp_store[email]
+
+        audit_log_crud.create_audit_log(
+            session,
+            AuditLogCreate(
+                description="OTP verified",
+                ip_address=request.client.host,
+                action=AuditLogAction.DOCUMENT_SIGNED,
+                signature_request_id=signature_request_id,
+            ),
+        )
 
     signature_request.status = SignatureRequestStatus.COMPLETED
     session.commit()
@@ -217,7 +219,7 @@ def verify_otp(
         final_pdf_path = (
             STATIC_FILES_DIR
             / "signed_documents"
-            / f"{document.owner_id}_{document.file}"
+            / f"{document.file}"
         )
         for signatory in signature_request.signatories:
             for field in signatory.fields:

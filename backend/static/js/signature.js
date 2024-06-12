@@ -1,249 +1,279 @@
-async function initializeSignaturePage(email, signatureRequestId) {
-	const documentLinks = document.querySelectorAll(".document-link");
-	const pdfContainer = document.getElementById("pdf-container");
-	const nextDocButton = document.getElementById("next-doc");
-	const prevDocButton = document.getElementById("prev-doc");
-	const drawSignButton = document.getElementById("draw-signature-btn");
-	const signButton = document.getElementById("sign-btn");
-	const emailInput = document.getElementById("otp-email-input");
-	const otpInput = document.getElementById("otp-input");
-	const sendOtpBtn = document.getElementById("send-otp-btn");
-	const verifyOtpBtn = document.getElementById("verify-otp-btn");
-	let currentDocIndex = 0;
-	const viewedDocs = new Map();
+async function initializeSignaturePage(email, signatureRequestId, requireOtp) {
+    const documentLinks = document.querySelectorAll(".document-link");
+    const pdfContainer = document.getElementById("pdf-container");
+    const nextDocButton = document.getElementById("next-doc");
+    const prevDocButton = document.getElementById("prev-doc");
+    const drawSignButton = document.getElementById("draw-signature-btn");
+    const signButton = document.getElementById("sign-btn");
+    const emailInput = document.getElementById("otp-email-input");
+    const otpInput = document.getElementById("otp-input");
+    const sendOtpBtn = document.getElementById("send-otp-btn");
+    const verifyOtpBtn = document.getElementById("verify-otp-btn");
+    let currentDocIndex = 0;
+    const viewedDocs = new Map();
 
-	// Initialize the first document display
-	updateDocumentDisplay(currentDocIndex);
+    // Initialize the first document display
+    updateDocumentDisplay(currentDocIndex);
 
-	documentLinks.forEach((link, index) => {
-		viewedDocs.set(index, false);
-		link.addEventListener("click", (event) => {
-			event.preventDefault();
-			updateDocumentDisplay(index);
-		});
-	});
+    documentLinks.forEach((link, index) => {
+        viewedDocs.set(index, false);
+        link.addEventListener("click", (event) => {
+            event.preventDefault();
+            updateDocumentDisplay(index);
+        });
+    });
 
-	async function updateDocumentDisplay(index) {
-		const urls = JSON.parse(
-			documentLinks[index].dataset.urls.replace(/'/g, '"'),
-		);
-		currentDocIndex = index;
-		console.log("Loading images for document index:", index, "URLs:", urls);
-		await loadImages(urls);
-		attachScrollListener(index);
-		updateButtonStates();
-	}
+    async function updateDocumentDisplay(index) {
+        const urls = JSON.parse(
+            documentLinks[index].dataset.urls.replace(/'/g, '"'),
+        );
+        currentDocIndex = index;
+        console.log("Loading images for document index:", index, "URLs:", urls);
+        await loadImages(urls);
+        attachScrollListener(index);
+        updateButtonStates();
+    }
 
-	async function loadImages(urls) {
-		pdfContainer.innerHTML = "";
-		for (const url of urls) {
-			const img = document.createElement("img");
-			img.src = url;
-			img.style.width = "100%";
-			img.onload = () => console.log("Loaded image:", url);
-			img.onerror = (err) => console.error("Error loading image:", url, err);
-			pdfContainer.appendChild(img);
-		}
-	}
+    async function loadImages(urls) {
+        pdfContainer.innerHTML = "";
+        for (const url of urls) {
+            const img = document.createElement("img");
+            img.src = url;
+            img.style.width = "100%";
+            img.onload = () => console.log("Loaded image:", url);
+            img.onerror = (err) => console.error("Error loading image:", url, err);
+            pdfContainer.appendChild(img);
+        }
+    }
 
-	function attachScrollListener(index) {
-		console.log(`Attaching scroll listener to document ${index}`);
-		pdfContainer.addEventListener("scroll", () => checkScrollToEnd(index), {
-			passive: true,
-		});
-	}
+    function attachScrollListener(index) {
+        console.log(`Attaching scroll listener to document ${index}`);
+        pdfContainer.addEventListener("scroll", () => checkScrollToEnd(index), {
+            passive: true,
+        });
+    }
 
-	function checkScrollToEnd(index) {
-		const scrollTop = pdfContainer.scrollTop;
-		const scrollHeight = pdfContainer.scrollHeight;
-		const clientHeight = pdfContainer.clientHeight;
-		const scrolledToEnd = scrollTop + clientHeight >= scrollHeight - 5;
-		if (scrolledToEnd && !viewedDocs.get(index)) {
-			console.log(`Document ${index} viewed`);
-			viewedDocs.set(index, true);
-			documentLinks[index].parentElement.querySelector(
-				".read-status",
-			).textContent = "(Read)";
-			checkAllDocumentsViewed();
-		}
-	}
+    function checkScrollToEnd(index) {
+        const scrollTop = pdfContainer.scrollTop;
+        const scrollHeight = pdfContainer.scrollHeight;
+        const clientHeight = pdfContainer.clientHeight;
+        const scrolledToEnd = scrollTop + clientHeight >= scrollHeight - 5;
+        if (scrolledToEnd && !viewedDocs.get(index)) {
+            console.log(`Document ${index} viewed`);
+            viewedDocs.set(index, true);
+            documentLinks[index].parentElement.querySelector(
+                ".read-status",
+            ).textContent = "(Read)";
+            checkAllDocumentsViewed();
+        }
+    }
 
-	function checkAllDocumentsViewed() {
-		const allViewed = Array.from(viewedDocs.values()).every((status) => status);
-		signButton.disabled = !allViewed;
-		nextDocButton.disabled =
-			!viewedDocs.get(currentDocIndex) ||
-			currentDocIndex === documentLinks.length - 1;
-	}
+    function checkAllDocumentsViewed() {
+        const allViewed = Array.from(viewedDocs.values()).every((status) => status);
+        signButton.disabled = !allViewed;
+        nextDocButton.disabled =
+            !viewedDocs.get(currentDocIndex) ||
+            currentDocIndex === documentLinks.length - 1;
+    }
 
-	function updateButtonStates() {
-		prevDocButton.disabled = currentDocIndex === 0;
-		nextDocButton.disabled = currentDocIndex === documentLinks.length - 1;
-	}
+    function updateButtonStates() {
+        prevDocButton.disabled = currentDocIndex === 0;
+        nextDocButton.disabled = currentDocIndex === documentLinks.length - 1;
+    }
 
-	nextDocButton.addEventListener("click", () => {
-		if (currentDocIndex < documentLinks.length - 1) {
-			updateDocumentDisplay(currentDocIndex + 1);
-		}
-	});
+    nextDocButton.addEventListener("click", () => {
+        if (currentDocIndex < documentLinks.length - 1) {
+            updateDocumentDisplay(currentDocIndex + 1);
+        }
+    });
 
-	prevDocButton.addEventListener("click", () => {
-		if (currentDocIndex > 0) {
-			updateDocumentDisplay(currentDocIndex - 1);
-		}
-	});
+    prevDocButton.addEventListener("click", () => {
+        if (currentDocIndex > 0) {
+            updateDocumentDisplay(currentDocIndex - 1);
+        }
+    });
 
-	drawSignButton.addEventListener("click", () => {
-		$("#signatureModal").modal("show");
-	});
+    drawSignButton.addEventListener("click", () => {
+        $("#signatureModal").modal("show");
+    });
 
-	signButton.addEventListener("click", () => {
-		$("#otpModal").modal("show");
-	});
+    signButton.addEventListener("click", () => {
+        if (requireOtp) {
+            $("#otpModal").modal("show");
+        } else {
+            verifyOtpWithoutModal();
+        }
+    });
 
-	sendOtpBtn.addEventListener("click", sendOtp);
-	verifyOtpBtn.addEventListener("click", verifyOtp);
+    sendOtpBtn.addEventListener("click", sendOtp);
+    verifyOtpBtn.addEventListener("click", verifyOtp);
 
-	function sendOtp() {
-		sendOtpBtn.disabled = true;
-		fetch("/api/v1/signe/send_otp", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/x-www-form-urlencoded",
-			},
-			body: new URLSearchParams({
-				email: emailInput.value,
-				signature_request_id: signatureRequestId,
-			}),
-		})
-			.then((response) => {
-				sendOtpBtn.disabled = false;
-				if (response.ok) {
-					alert("OTP sent successfully");
-					otpInput.disabled = false;
-					verifyOtpBtn.disabled = false;
-				} else {
-					alert("Failed to send OTP");
-					otpInput.disabled = true;
-					verifyOtpBtn.disabled = true;
-				}
-			})
-			.catch((error) => {
-				alert("Error sending OTP: " + error.message);
-				sendOtpBtn.disabled = false;
-			});
-	}
+    function sendOtp() {
+        sendOtpBtn.disabled = true;
+        fetch("/api/v1/signe/send_otp", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams({
+                email: emailInput.value,
+                signature_request_id: signatureRequestId,
+            }),
+        })
+            .then((response) => {
+                sendOtpBtn.disabled = false;
+                if (response.ok) {
+                    alert("OTP sent successfully");
+                    otpInput.disabled = false;
+                    verifyOtpBtn.disabled = false;
+                } else {
+                    alert("Failed to send OTP");
+                    otpInput.disabled = true;
+                    verifyOtpBtn.disabled = true;
+                }
+            })
+            .catch((error) => {
+                alert("Error sending OTP: " + error.message);
+                sendOtpBtn.disabled = false;
+            });
+    }
 
-	async function verifyOtp() {
-		verifyOtpBtn.disabled = true;
-		try {
-			const response = await fetch("/api/v1/signe/verify_otp", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/x-www-form-urlencoded",
-				},
-				body: new URLSearchParams({
-					email: emailInput.value,
-					otp: otpInput.value,
-					signature_request_id: signatureRequestId,
-				}),
-			});
+    async function verifyOtp(event) {
+        event.preventDefault();
+        verifyOtpBtn.disabled = true;
+        try {
+            const response = await fetch("/api/v1/signe/verify_otp", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                    email: emailInput.value,
+                    otp: otpInput.value,
+                    signature_request_id: signatureRequestId,
+                }),
+            });
 
-			verifyOtpBtn.disabled = false;
-			if (response.ok) {
-				const data = await response.json();
-				alert(data.message);
-				$("#otpModal").modal("hide");
-				resetModal();
-				window.location.href = "/api/v1/signe/success"; // Redirect to the success page
-			} else {
-				const errorData = await response.json();
-				alert(`Failed to verify OTP: ${errorData.detail}`);
-			}
-		} catch (error) {
-			alert(`Error verifying OTP: ${error.message}`);
-			verifyOtpBtn.disabled = false;
-		}
-	}
+            verifyOtpBtn.disabled = false;
+            if (response.ok) {
+                alert("OTP verified successfully");
+                $("#otpModal").modal("hide");
+                resetModal();
+                window.location.href = "/api/v1/signe/success"; // Redirect to the success page
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to verify OTP: ${errorData.detail}`);
+            }
+        } catch (error) {
+            alert(`Error verifying OTP: ${error.message}`);
+            verifyOtpBtn.disabled = false;
+        }
+    }
 
-	function resetModal() {
-		otpInput.value = "";
-		otpInput.disabled = true;
-		verifyOtpBtn.disabled = true;
-	}
+    async function verifyOtpWithoutModal() {
+        try {
+            const response = await fetch("/api/v1/signe/verify_otp", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                    email: email,
+                    signature_request_id: signatureRequestId,
+                }),
+            });
 
-	const signaturePad = document
-		.getElementById("signature-canvas")
-		.getContext("2d");
-	const clearButton = document.getElementById("clear-signature-btn");
-	const saveButton = document.getElementById("save-signature-btn");
-	const signatureModal = $("#signatureModal");
-	let isDrawing = false;
+            if (response.ok) {
+                alert("Signature processed successfully");
+                window.location.href = "/api/v1/signe/success"; // Redirect to the success page
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to process signature: ${errorData.detail}`);
+            }
+        } catch (error) {
+            alert(`Error processing signature: ${error.message}`);
+        }
+    }
 
-	document
-		.getElementById("signature-canvas")
-		.addEventListener("mousedown", startDrawing);
-	document
-		.getElementById("signature-canvas")
-		.addEventListener("mousemove", draw);
-	document
-		.getElementById("signature-canvas")
-		.addEventListener("mouseup", stopDrawing);
-	document
-		.getElementById("signature-canvas")
-		.addEventListener("mouseleave", stopDrawing);
+    function resetModal() {
+        otpInput.value = "";
+        otpInput.disabled = true;
+        verifyOtpBtn.disabled = true;
+    }
 
-	clearButton.onclick = () => {
-		signaturePad.clearRect(
-			0,
-			0,
-			signaturePad.canvas.width,
-			signaturePad.canvas.height,
-		);
-	};
+    const signaturePad = document.getElementById("signature-canvas").getContext("2d");
+    const clearButton = document.getElementById("clear-signature-btn");
+    const saveButton = document.getElementById("save-signature-btn");
+    const signatureModal = $("#signatureModal");
+    let isDrawing = false;
 
-	saveButton.onclick = async () => {
-		const signatureData = signaturePad.canvas.toDataURL("image/png");
-		console.log("Signature Data:", signatureData);
+    document
+        .getElementById("signature-canvas")
+        .addEventListener("mousedown", startDrawing);
+    document
+        .getElementById("signature-canvas")
+        .addEventListener("mousemove", draw);
+    document
+        .getElementById("signature-canvas")
+        .addEventListener("mouseup", stopDrawing);
+    document
+        .getElementById("signature-canvas")
+        .addEventListener("mouseleave", stopDrawing);
 
-		try {
-			const response = await fetch("/api/v1/signe/save_signature", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					email: emailInput.value,
-					signature_request_id: signatureRequestId,
-					signature_image: signatureData,
-				}),
-			});
+    clearButton.onclick = () => {
+        signaturePad.clearRect(
+            0,
+            0,
+            signaturePad.canvas.width,
+            signaturePad.canvas.height,
+        );
+    };
 
-			if (response.ok) {
-				alert("Signature saved successfully");
-				signatureModal.modal("hide");
-			} else {
-				const errorData = await response.json();
-				alert(`Failed to save signature: ${errorData.detail}`);
-			}
-		} catch (error) {
-			alert(`Error saving signature: ${error.message}`);
-		}
-	};
+    saveButton.onclick = async () => {
+        const signatureData = signaturePad.canvas.toDataURL("image/png");
+        console.log("Signature Data:", signatureData);
 
-	function startDrawing(e) {
-		isDrawing = true;
-		signaturePad.beginPath();
-		signaturePad.moveTo(e.offsetX, e.offsetY);
-	}
+        try {
+            const response = await fetch("/api/v1/signe/save_signature", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    email: email,
+                    signature_request_id: signatureRequestId,
+                    signature_image: signatureData,
+                }),
+            });
 
-	function draw(e) {
-		if (!isDrawing) return;
-		signaturePad.lineTo(e.offsetX, e.offsetY);
-		signaturePad.stroke();
-	}
+            if (response.ok) {
+                alert("Signature saved successfully");
+                signatureModal.modal("hide");
+                if (!requireOtp) {
+                    window.location.href = "/api/v1/signe/success"; // Redirect to the success page if OTP is not required
+                }
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to save signature: ${errorData.detail}`);
+            }
+        } catch (error) {
+            alert(`Error saving signature: ${error.message}`);
+        }
+    };
 
-	function stopDrawing() {
-		isDrawing = false;
-	}
+    function startDrawing(e) {
+        isDrawing = true;
+        signaturePad.beginPath();
+        signaturePad.moveTo(e.offsetX, e.offsetY);
+    }
+
+    function draw(e) {
+        if (!isDrawing) return;
+        signaturePad.lineTo(e.offsetX, e.offsetY);
+        signaturePad.stroke();
+    }
+
+    function stopDrawing() {
+        isDrawing = false;
+    }
 }

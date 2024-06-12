@@ -298,6 +298,7 @@ class SignatureRequestBase(BaseModel):
     reminder_settings: ReminderSettingsSchema | None = None
     expiry_date: datetime | None = None
     message: str | None = None
+    token: str | None = Field(None, description="Token to get the Iframe for Signature")
 
     class Config:
         from_attributes = True

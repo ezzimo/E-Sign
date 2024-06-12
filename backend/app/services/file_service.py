@@ -96,7 +96,7 @@ def generate_secure_link(
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
     secure_link = f"{settings.FRONTEND_URL}/api/v1/signe/sign_document?token={token}"
-    return secure_link
+    return secure_link, token
 
 
 def apply_pdf_security(pdf_path: str):
@@ -200,8 +200,8 @@ def draw_doc_field(c, field, signatory):
 
 
 def add_fields_to_pdf(document_filename, field, signatory, owner_id):
-    base_path = UPLOAD_DIR / f"{owner_id}_{document_filename}"
-    signed_path = UPLOAD_DIR / "signed_documents" / f"{owner_id}_{document_filename}"
+    base_path = UPLOAD_DIR / f"{document_filename}"
+    signed_path = UPLOAD_DIR / "signed_documents" / f"{document_filename}"
 
     # Check if file exists in 'signed_documents'
     file_path = signed_path if signed_path.exists() else base_path
