@@ -87,9 +87,10 @@ def initiate_signature_request(
     )
 
     email_response = None
+    token = None
     if len(signature_request.signatories) == 1:
         signatory = signature_request_data.signatories[0]
-        secure_link = generate_secure_link(
+        secure_link, token = generate_secure_link(
             signature_request_data.expiry_date,
             signature_request_data.id,
             signatory.email,
@@ -314,3 +315,113 @@ async def download_signed_document(
     return FileResponse(
         path=pdf_path, filename=document.title, media_type="application/pdf"
     )
+
+
+@router.put("/{request_id}/cancel", response_model=SignatureRequestRead)
+def cancel_signature_request(
+    request: Request,
+    request_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Cancel a signature request.
+    """
+    db_request = get_signature_request(db=db, request_id=request_id)
+    if db_request is None:
+        raise HTTPException(status_code=404, detail="Signature request not found")
+    if db_request.status in [
+        SignatureRequestStatus.COMPLETED,
+        SignatureRequestStatus.EXPIRED,
+    ]:
+        raise HTTPException(
+            status_code=400, detail="Completed or expired requests cannot be canceled"
+        )
+
+    db_request.status = SignatureRequestStatus.CANCELED
+    db.commit()
+    db.refresh(db_request)
+
+    # Create an audit log for the cancellation
+    audit_log_crud.create_audit_log(
+        db,
+        AuditLogCreate(
+            description="Signature request canceled",
+            ip_address=request.client.host,
+            action=AuditLogAction.SIGNATURE_REQUEST_CANCELED,
+            signature_request_id=db_request.id,
+        ),
+    )
+
+    return db_request
+
+
+@router.put("/{request_id}/activate", response_model=SignatureRequestRead)
+def activate_signature_request(
+    request_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Activate a canceled signature request.
+    """
+    db_request = get_signature_request(db=db, request_id=request_id)
+    if db_request is None:
+        raise HTTPException(status_code=404, detail="Signature request not found")
+    if db_request.status in [
+        SignatureRequestStatus.COMPLETED,
+        SignatureRequestStatus.EXPIRED,
+    ]:
+        raise HTTPException(
+            status_code=400, detail="Completed or expired requests cannot be activated"
+        )
+    if db_request.status != SignatureRequestStatus.CANCELED:
+        raise HTTPException(
+            status_code=400, detail="Only canceled requests can be activated"
+        )
+
+    # Update the status to SENT
+    db_request.status = SignatureRequestStatus.SENT
+    db.commit()
+    db.refresh(db_request)
+
+    # Send a new email as in the initiation of the signature request
+    first_signatory = db_request.signatories[0]
+    secure_link, token = generate_secure_link(
+        db_request.expiry_date,
+        db_request.id,
+        first_signatory.email,
+        [document.id for document in db_request.documents],
+        first_signatory.id,
+        db_request.require_otp,
+    )
+    email_response = send_signature_request_email(
+        email_to=first_signatory.email,
+        document_title="signature request",
+        link=secure_link,
+        message=db_request.message,
+    )
+
+    if email_response and email_response.status_code == 250:
+        # Email sent successfully, create an audit log
+        audit_log_crud.create_audit_log(
+            db,
+            AuditLogCreate(
+                description="Signature request reactivated",
+                ip_address=request.client.host,
+                action=AuditLogAction.SIGNATURE_REQUEST_REACTIVATED,
+                signature_request_id=db_request.id,
+            ),
+        )
+    else:
+        # Email sending failed, raise an error
+        error_message = f"""
+            Failed to send email: {email_response.status_text if email_response else 'No response'}
+        """
+        logging.error(error_message)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=error_message
+        )
+
+    return db_request

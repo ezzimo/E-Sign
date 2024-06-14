@@ -1,3 +1,4 @@
 .vscode
 esign_venv
 document_files
+signatures/*.png

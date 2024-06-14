@@ -1,23 +1,25 @@
+import hashlib
 import io
 import logging
 import os
-import PyPDF2
 import random
 import string
-import hashlib
-from app.models.models import FieldType
-from pathlib import Path
-from typing import Optional, List
-from jose import JWTError, jwt
-from fastapi import UploadFile, HTTPException
-from app.core.config import settings
-from app.utils import send_email
 from datetime import datetime
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.pdfmetrics import registerFont
+from pathlib import Path
+
+import PyPDF2
+from fastapi import HTTPException, UploadFile
+from jose import JWTError, jwt
 from reportlab.lib.colors import black
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase.pdfmetrics import registerFont
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+
+from app.core.config import settings
+from app.models.models import FieldType
+from app.utils import send_email
 
 # Register a handwriting-like font
 registerFont(TTFont("Handwriting", "static/fonts/Allura-Regular.ttf"))
@@ -29,7 +31,7 @@ UPLOAD_DIR = Path("/app/static/document_files")
 
 def generate_unique_filename(user_id: int, original_filename: str) -> str:
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+    random_string = "".join(random.choices(string.ascii_letters + string.digits, k=8))
     file_extension = Path(original_filename).suffix
     unique_filename = f"{user_id}_{timestamp}_{random_string}{file_extension}"
     return unique_filename
@@ -51,7 +53,7 @@ def file_existence(file_path: str) -> bool:
     return True
 
 
-def verify_secure_link_token(token: str) -> Optional[dict]:
+def verify_secure_link_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
         expiration = payload.get("exp")
@@ -72,8 +74,7 @@ def generate_otp() -> str:
 def send_otp_code(email: str, otp: int) -> bool:
     subject = "Your OTP Code"
     html_content = f"<p>Your OTP code is: {otp}</p>"
-    response = send_email(email_to=email, subject=subject,
-                          html_content=html_content)
+    response = send_email(email_to=email, subject=subject, html_content=html_content)
     return response.status_code == 250
 
 
@@ -81,7 +82,7 @@ def generate_secure_link(
     expiry_date: datetime,
     signature_request_id: int,
     email: str,
-    document_ids: List[int],
+    document_ids: list[int],
     signatory_id: int,
     require_otp: bool,
 ) -> str:
@@ -128,22 +129,36 @@ def apply_pdf_security(pdf_path: str):
 def draw_signature_field(c, field, signatory):
     logger.info(
         f"""
-        Drawing signature field for signatory:
+        Drawing signature field for signatory {signatory.id}:
         {signatory.first_name} {signatory.last_name} at ({field.x}, {field.y})
         with dimensions ({field.width}, {field.height})
         """
     )
     if signatory.signature_image:
         logger.info(f"Using signature image at {signatory.signature_image}")
-        c.drawImage(
-            signatory.signature_image, field.x, field.y, field.width, field.height
-        )
+        try:
+            image = ImageReader(signatory.signature_image)
+            c.drawImage(
+                image,
+                field.x,
+                field.y,
+                width=field.width,
+                height=field.height,
+                mask="auto",
+            )
+        except Exception as e:
+            logger.error(f"Failed to draw signature image: {e}")
+            # Fallback to handwritten font if image drawing fails
+            c.setFont("Handwriting", 24)
+            c.setFillColor(black)
+            c.drawString(
+                field.x, field.y, f"{signatory.first_name} {signatory.last_name}"
+            )
     else:
         logger.info("Using handwritten font for signature")
         c.setFont("Handwriting", 24)
         c.setFillColor(black)
-        c.drawString(field.x, field.y,
-                     f"{signatory.first_name} {signatory.last_name}")
+        c.drawString(field.x, field.y, f"{signatory.first_name} {signatory.last_name}")
     # c.rect(field.x, field.y - 10, field.width, field.height)
 
 

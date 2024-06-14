@@ -3,7 +3,14 @@ import logging
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from app.models.models import Document, DocField, Signatory, SignatureRequest, User, ReminderSettings
+from app.models.models import (
+    DocField,
+    Document,
+    ReminderSettings,
+    Signatory,
+    SignatureRequest,
+    User,
+)
 from app.schemas.schemas import (
     SignatureRequestCreate,
     SignatureRequestUpdate,
@@ -46,6 +53,15 @@ def create_signature_request(
     for signer_data in request_data.signatories:
         signatory_info = signer_data.info
 
+        # Find a user by email to link as the signer
+        user: User | None = db.exec(
+            select(User).where(User.email == signatory_info.email)
+        ).first()
+
+        # If found, link as the signer
+        signer_id = user.id if user else None
+        signer = user if user else None
+
         new_signer = Signatory(
             first_name=signatory_info.first_name,
             last_name=signatory_info.last_name,
@@ -54,6 +70,8 @@ def create_signature_request(
             role=signatory_info.role,
             signing_order=signatory_info.signing_order,
             creator_id=sender_id,
+            user_id=signer_id,
+            user=signer,
         )
 
         db.add(new_signer)
@@ -142,7 +160,9 @@ def get_signatories_by_signature_request(
     return db.exec(select(Signatory).where(Signatory.signatory_id == request_id)).all()
 
 
-def get_all_signature_requests(db: Session, current_user: User) -> list[SignatureRequest]:
+def get_all_signature_requests(
+    db: Session, current_user: User
+) -> list[SignatureRequest]:
     """
     Retrieve all signature requests. If the user is an admin, fetch all requests,
     otherwise fetch only the requests created by the user.
@@ -151,5 +171,7 @@ def get_all_signature_requests(db: Session, current_user: User) -> list[Signatur
         return db.exec(select(SignatureRequest)).all()
     else:
         return db.exec(
-            select(SignatureRequest).where(SignatureRequest.sender_id == current_user.id)
+            select(SignatureRequest).where(
+                SignatureRequest.sender_id == current_user.id
+            )
         ).all()

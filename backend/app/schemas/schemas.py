@@ -268,6 +268,7 @@ class SignatoryUpdate(SignatoryBase):
     last_name: str | None = None
     email: EmailStr | None = None
     phone_number: str | None = None
+    role: str | None = None
     signing_order: int | None = None
     signature_image: str | None = None
     signed_at: datetime | None = None

@@ -1,10 +1,10 @@
+import enum
 from datetime import datetime
 from enum import Enum
-from typing import Optional, List
+from typing import Optional
 
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Field, Relationship, SQLModel
-import enum
 
 
 class UserBase(SQLModel):
@@ -24,14 +24,12 @@ class User(UserBase, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-    documents: List["Document"] = Relationship(back_populates="owner")
-    signatories: List["Signatory"] = Relationship(
+    documents: list["Document"] = Relationship(back_populates="owner")
+    signatories: list["Signatory"] = Relationship(
         back_populates="creator",
-        sa_relationship_kwargs={"foreign_keys": "Signatory.creator_id"}
+        sa_relationship_kwargs={"foreign_keys": "Signatory.creator_id"},
     )
-    requests: List["SignatureRequest"] = Relationship(
-        back_populates="sender"
-    )
+    requests: list["SignatureRequest"] = Relationship(back_populates="sender")
 
 
 # Enum definitions
@@ -67,156 +65,155 @@ class BaseModel(SQLModel):
 
 
 class RequestDocumentLink(SQLModel, table=True):
-    signature_request_id: Optional[int] = Field(
+    signature_request_id: int | None = Field(
         default=None, foreign_key="signaturerequest.id", primary_key=True
     )
-    document_id: Optional[int] = Field(
+    document_id: int | None = Field(
         default=None, foreign_key="document.id", primary_key=True
     )
 
 
 class RequestSignatoryLink(SQLModel, table=True):
-    signature_request_id: Optional[int] = Field(
+    signature_request_id: int | None = Field(
         default=None, foreign_key="signaturerequest.id", primary_key=True
     )
-    signatory_id: Optional[int] = Field(
+    signatory_id: int | None = Field(
         default=None, foreign_key="signatory.id", primary_key=True
     )
 
 
 class Document(BaseModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     title: str
     file: str
-    file_url: Optional[str] = None
+    file_url: str | None = None
     status: DocumentStatus = Field(sa_column=SAEnum(DocumentStatus))
     owner_id: int = Field(foreign_key="user.id")
 
     owner: User = Relationship(back_populates="documents")
-    signature_requests: List["SignatureRequest"] = Relationship(
-        back_populates="documents",
-        link_model=RequestDocumentLink
+    signature_requests: list["SignatureRequest"] = Relationship(
+        back_populates="documents", link_model=RequestDocumentLink
     )
-    signature_details: Optional["DocumentSignatureDetails"] = Relationship(back_populates="document")
+    signature_details: Optional["DocumentSignatureDetails"] = Relationship(
+        back_populates="document"
+    )
 
 
 class DocumentSignatureDetails(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     document_id: int = Field(foreign_key="document.id")
     signed_hash: str = Field(description="SHA-256 hash of the signed document")
     timestamp: datetime = Field(
-        default_factory=datetime.now, description="The time when the document was signed"
+        default_factory=datetime.now,
+        description="The time when the document was signed",
     )
-    certified_timestamp: Optional[str] = Field(default=None, description="Certified timestamp if available")
-    ip_address: Optional[str] = Field(default=None, description="IP address of the signer")
+    certified_timestamp: str | None = Field(
+        default=None, description="Certified timestamp if available"
+    )
+    ip_address: str | None = Field(default=None, description="IP address of the signer")
 
     document: Document = Relationship(back_populates="signature_details")
 
 
 class DocField(BaseModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     type: FieldType = Field(sa_column=SAEnum(FieldType))
     page: int
-    x: Optional[int] = None
-    y: Optional[int] = None
-    height: Optional[int] = None
-    width: Optional[int] = None
-    optional: Optional[bool] = None
-    mention: Optional[str] = None
-    name: Optional[str] = None
-    checked: Optional[bool] = None
+    x: int | None = None
+    y: int | None = None
+    height: int | None = None
+    width: int | None = None
+    optional: bool | None = None
+    mention: str | None = None
+    name: str | None = None
+    checked: bool | None = None
     document_id: int = Field(foreign_key="document.id")
-    signature_request_id: Optional[int] = Field(foreign_key="signaturerequest.id")
-    signer_id: Optional[int] = Field(default=None, foreign_key="signatory.id")
-    max_length: Optional[int] = None
-    question: Optional[str] = None
-    instruction: Optional[str] = None
-    text: Optional[str] = None
+    signature_request_id: int | None = Field(foreign_key="signaturerequest.id")
+    signer_id: int | None = Field(default=None, foreign_key="signatory.id")
+    max_length: int | None = None
+    question: str | None = None
+    instruction: str | None = None
+    text: str | None = None
 
     signatory: Optional["Signatory"] = Relationship(back_populates="fields")
-    radios: List["Radio"] = Relationship(back_populates="doc_field")
+    radios: list["Radio"] = Relationship(back_populates="doc_field")
 
 
 class Radio(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     field_id: int = Field(foreign_key="docfield.id")
     name: str
     x: int
     y: int
-    size: Optional[int] = Field(default=24)
+    size: int | None = Field(default=24)
 
     doc_field: DocField = Relationship(back_populates="radios")
 
 
 class Signatory(BaseModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     role: str = Field(
         sa_column=SAEnum("signer", "viewer", "approver", name="role_types")
     )
     signing_order: int
-    signed_at: Optional[datetime] = None
-    signature_image: Optional[str] = None
+    signed_at: datetime | None = None
+    signature_image: str | None = None
     first_name: str
     last_name: str
     email: str
-    phone_number: Optional[str] = Field(
+    phone_number: str | None = Field(
         default=None, description="Phone number in E.164 format (e.g., +123456789)"
     )
-    user_id: Optional[int] = Field(default=None, foreign_key="user.id")
+    user_id: int | None = Field(default=None, foreign_key="user.id")
     creator_id: int = Field(default=None, foreign_key="user.id")
 
-    user: Optional[User] = Relationship(
+    user: User | None = Relationship(
         sa_relationship_kwargs={"foreign_keys": "Signatory.user_id"}
     )
     creator: User = Relationship(
         sa_relationship_kwargs={"foreign_keys": "Signatory.creator_id"},
-        back_populates="signatories"
-    )
-    fields: List[DocField] = Relationship(back_populates="signatory")
-    signature_requests: List["SignatureRequest"] = Relationship(
         back_populates="signatories",
-        link_model=RequestSignatoryLink
+    )
+    fields: list[DocField] = Relationship(back_populates="signatory")
+    signature_requests: list["SignatureRequest"] = Relationship(
+        back_populates="signatories", link_model=RequestSignatoryLink
     )
 
 
 class ReminderSettings(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     interval_in_days: int
     max_occurrences: int
-    timezone: Optional[str] = None
-    request_id: Optional[int] = Field(foreign_key="signaturerequest.id")
+    timezone: str | None = None
+    request_id: int | None = Field(foreign_key="signaturerequest.id")
     request: "SignatureRequest" = Relationship(
         sa_relationship_kwargs={"foreign_keys": "ReminderSettings.request_id"}
     )
 
 
 class SignatureRequest(BaseModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     status: SignatureRequestStatus = Field(
         default=SignatureRequestStatus.DRAFT, sa_column=SAEnum(SignatureRequestStatus)
     )
     name: str
     delivery_mode: str
-    message: Optional[str] = None
-    expiry_date: Optional[datetime] = None
+    message: str | None = None
+    expiry_date: datetime | None = None
     ordered_signers: bool = Field(default=False)
     sender_id: int = Field(foreign_key="user.id")
     require_otp: bool = Field(default=True)
-    token: Optional[str] = None
+    token: str | None = None
 
     sender: User = Relationship()
-    documents: List[Document] = Relationship(
-        back_populates="signature_requests",
-        link_model=RequestDocumentLink
+    documents: list[Document] = Relationship(
+        back_populates="signature_requests", link_model=RequestDocumentLink
     )
-    signatories: List[Signatory] = Relationship(
-        back_populates="signature_requests",
-        link_model=RequestSignatoryLink
+    signatories: list[Signatory] = Relationship(
+        back_populates="signature_requests", link_model=RequestSignatoryLink
     )
-    audit_logs: List["AuditLog"] = Relationship(back_populates="signature_request")
-    reminder_settings: Optional[ReminderSettings] = Relationship(
-        back_populates="request"
-    )
+    audit_logs: list["AuditLog"] = Relationship(back_populates="signature_request")
+    reminder_settings: ReminderSettings | None = Relationship(back_populates="request")
 
 
 class AuditLogAction(str, Enum):
@@ -224,6 +221,7 @@ class AuditLogAction(str, Enum):
     SIGNATURE_REQUESTED = "signature requested"
     DOCUMENT_SIGNED = "document signed"
     DOCUMENT_VIEWED = "document viewed"
+    SIGNATURE_REQUEST_CANCELED = "signature request canceled"
 
 
 class AuditLogBase(SQLModel):

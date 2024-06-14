@@ -1,9 +1,8 @@
+import base64
 import logging
 import random
-import base64
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -11,16 +10,21 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
 from app.api.deps import SessionDep
-from app.crud import audit_log_crud, signed_document_crud, signatory_crud
+from app.crud import audit_log_crud, signatory_crud, signed_document_crud
 from app.models.models import (
     AuditLogAction,
     Document,
     DocumentStatus,
+    RequestSignatoryLink,
     Signatory,
     SignatureRequest,
     SignatureRequestStatus,
 )
-from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate, SignatoryUpdate
+from app.schemas.schemas import (
+    AuditLogCreate,
+    DocumentSignatureDetailsCreate,
+    SignatoryUpdate,
+)
 from app.services.file_service import (
     add_fields_to_pdf,
     apply_pdf_security,
@@ -74,10 +78,11 @@ def access_document_with_token(
     )
     signature_request = session.exec(signature_request_statement).first()
     if not signature_request:
-        raise HTTPException(
-            status_code=404, detail="Signature request not found"
-        )
-    if signature_request.status in [SignatureRequestStatus.COMPLETED, SignatureRequestStatus.CANCELED]:
+        raise HTTPException(status_code=404, detail="Signature request not found")
+    if signature_request.status in [
+        SignatureRequestStatus.COMPLETED,
+        SignatureRequestStatus.CANCELED,
+    ]:
         if signature_request.status == SignatureRequestStatus.COMPLETED:
             return RedirectResponse(url="/api/v1/signe/signature_completed")
         elif signature_request.status == SignatureRequestStatus.CANCELED:
@@ -96,9 +101,7 @@ def access_document_with_token(
         image_folder = STATIC_FILES_DIR / folder_name
 
         if not image_folder.exists():
-            convert_pdf_to_images(
-                STATIC_FILES_DIR / f"{document.file}", image_folder
-            )
+            convert_pdf_to_images(STATIC_FILES_DIR / f"{document.file}", image_folder)
 
         # Ensure the images are already converted and available
 
@@ -181,7 +184,7 @@ def verify_otp(
     request: Request,
     session: SessionDep,
     email: str = Form(...),
-    otp: Optional[int] = Form(None),
+    otp: int | None = Form(None),
     signature_request_id: int = Form(...),
 ):
     signature_request = session.get(SignatureRequest, signature_request_id)
@@ -216,11 +219,7 @@ def verify_otp(
         document.status = DocumentStatus.SIGNED
         session.commit()
 
-        final_pdf_path = (
-            STATIC_FILES_DIR
-            / "signed_documents"
-            / f"{document.file}"
-        )
+        final_pdf_path = STATIC_FILES_DIR / "signed_documents" / f"{document.file}"
         for signatory in signature_request.signatories:
             for field in signatory.fields:
                 if field.document_id == document.id:
@@ -262,7 +261,7 @@ def verify_otp(
 def signature_success(request: Request):
     return templates.TemplateResponse(
         "main_pages/signature_success.html",
-        {"request": request, "message": "Document successfully signed!"}
+        {"request": request, "message": "Document successfully signed!"},
     )
 
 
@@ -270,17 +269,26 @@ def signature_success(request: Request):
 def save_signature(
     request: Request,
     session: SessionDep,
-    email: str = Form(...),
     signature_request_id: int = Form(...),
+    email: str = Form(...),
     signature_image: str = Form(...),
 ):
-    signatory = session.exec(select(Signatory).where(Signatory.email == email)).first()
+    signatory = session.exec(
+        select(Signatory)
+        .where(Signatory.email == email)
+        .join(RequestSignatoryLink)
+        .where(RequestSignatoryLink.signature_request_id == signature_request_id)
+    ).first()
+
     if not signatory:
-        raise HTTPException(status_code=404, detail="Signatory not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Signatory not found or not associated with the given signature request",
+        )
 
     # Decode the base64 image
     image_data = base64.b64decode(signature_image.split(",")[1])
-    signature_path = SIGNATURES_DIR / f"{signatory.id}.png"
+    signature_path = SIGNATURES_DIR / f"{signature_request_id}_{signatory.id}.png"
 
     # Save the image
     with open(signature_path, "wb") as f:
@@ -295,9 +303,13 @@ def save_signature(
 
 @router.get("/signature_completed", response_class=HTMLResponse)
 def signature_completed(request: Request):
-    return templates.TemplateResponse("main_pages/signature_completed.html", {"request": request})
+    return templates.TemplateResponse(
+        "main_pages/signature_completed.html", {"request": request}
+    )
 
 
 @router.get("/signature_canceled", response_class=HTMLResponse)
 def signature_canceled(request: Request):
-    return templates.TemplateResponse("main_pages/signature_canceled.html", {"request": request})
+    return templates.TemplateResponse(
+        "main_pages/signature_canceled.html", {"request": request}
+    )

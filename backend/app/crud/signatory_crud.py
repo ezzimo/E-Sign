@@ -1,12 +1,12 @@
 import logging
 
-from sqlmodel import Session, select
 from fastapi import HTTPException
+from sqlmodel import Session, select
 
 from app.models.models import (
+    DocField,
     Signatory,
     User,
-    DocField,
 )
 from app.schemas.schemas import FieldCreate, SignatoryCreate, SignatoryUpdate
 
@@ -53,7 +53,6 @@ def create_signatory(
         db_field = DocField(
             type=field.type,
             page=field.page,
-            signature_request_id="1",
             document_id=field.document_id,
             signer_id=signatory.id,
             optional=field.optional,
@@ -65,7 +64,6 @@ def create_signatory(
             height=field.height if field.height else None,
             width=field.width if field.width else None,
         )
-        # db_field = create_field(db, field_data=field, signatory_id=signatory.id)
         signatory.fields.append(db_field)
 
     db.commit()
