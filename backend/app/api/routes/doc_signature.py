@@ -30,7 +30,15 @@ from app.services.file_service import (
     apply_pdf_security,
     generate_pdf_hash,
     send_otp_code,
+    verify_otp_code,
     verify_secure_link_token,
+    get_signature_request,
+    get_signatory,
+    log_otp_verification,
+    process_signatory_signature,
+    all_signatories_signed,
+    finalize_document,
+    send_final_notifications,
 )
 from app.services.file_utils import convert_pdf_to_images
 from app.utils import send_signature_request_notification_email
@@ -252,6 +260,50 @@ def verify_otp(
             signature_request_id=signature_request_id,
             status=signature_request.status.value,
             documents=signed_documents,
+        )
+
+    return JSONResponse(content={"message": "Document successfully signed!"})
+
+
+@router.post("/verify_otp/test", response_class=JSONResponse)
+def verify_otp_2(
+    request: Request,
+    session: SessionDep,
+    email: str = Form(...),
+    otp: int | None = Form(None),
+    signature_request_id: int = Form(...),
+):
+    """
+    Verify the OTP for a signatory and handle the signing process.
+    """
+    signature_request = get_signature_request(session, signature_request_id)
+    signatory = get_signatory(session, email, signature_request_id)
+    static_files_dir = STATIC_FILES_DIR
+
+    if signature_request.require_otp:
+        verify_otp_code(email, otp, otp_store)
+
+        log_otp_verification(session, request.client.host, signature_request_id, signatory.id)
+
+    process_signatory_signature(
+        session, signatory, signature_request, request.client.host, static_files_dir
+    )
+
+    if all_signatories_signed(signature_request.signatories):
+        finalize_document(
+            session, signature_request, request.client.host, static_files_dir
+        )
+        send_final_notifications(signature_request, static_files_dir)
+    else:
+        send_signature_request_notification_email(
+            email_to=signatory.email,
+            signature_request_name=signature_request.name,
+            signature_request_id=signature_request.id,
+            status=signature_request.status.value,
+            documents=[
+                STATIC_FILES_DIR / "signed_documents" / f"{document.file}"
+                for document in signature_request.documents
+            ],
         )
 
     return JSONResponse(content={"message": "Document successfully signed!"})

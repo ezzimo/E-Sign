@@ -1,11 +1,10 @@
 from fastapi import APIRouter
 
-from app.api.routes import (
+from app.api.routes import (  # items,
     audit_logs,
-    documents,
     doc_signature,
+    documents,
     fields,
-    # items,
     login,
     signatories,
     signature_requests,
@@ -28,4 +27,6 @@ api_router.include_router(
     signature_requests.router, prefix="/signature_requests", tags=["signature_requests"]
 )
 
-api_router.include_router(doc_signature.router, prefix="/signe", tags=["document_signatures"])
+api_router.include_router(
+    doc_signature.router, prefix="/signe", tags=["document_signatures"]
+)

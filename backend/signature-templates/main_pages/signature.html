@@ -85,13 +85,21 @@
 
 {% block scripts %}
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="{{ url_for('static', path='js/signature.js') }}"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', (event) => {
-        const email = "{{ email }}";
-        const signatureRequestId = "{{ signature_request_id }}";
-        const requireOtp = "{{ require_otp|tojson }}";
-        initializeSignaturePage(email, signatureRequestId, requireOtp);
-    });
+    let js_link = "{{ url_for('static', path='js/signature.js') }}";
+    js_link = js_link.replace('http://', 'https://');
+    const script = document.createElement('script');
+    script.src = js_link;
+
+    document.head.appendChild(script);
+    script.onload = function() {
+           console.log('Script loaded successfully.');
+
+           const email = "{{ email }}";
+           const signatureRequestId = "{{ signature_request_id }}";
+           const requireOtp = "{{ require_otp|tojson }}";
+
+          initializeSignaturePage(email, signatureRequestId, requireOtp);
+ };
 </script>
 {% endblock %}

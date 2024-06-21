@@ -3,11 +3,7 @@ import logging
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
-from app.models.models import (
-    DocField,
-    Signatory,
-    User,
-)
+from app.models.models import DocField, Signatory, User
 from app.schemas.schemas import FieldCreate, SignatoryCreate, SignatoryUpdate
 
 # Configure logging

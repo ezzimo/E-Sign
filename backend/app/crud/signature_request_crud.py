@@ -11,10 +11,7 @@ from app.models.models import (
     SignatureRequest,
     User,
 )
-from app.schemas.schemas import (
-    SignatureRequestCreate,
-    SignatureRequestUpdate,
-)
+from app.schemas.schemas import SignatureRequestCreate, SignatureRequestUpdate
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"

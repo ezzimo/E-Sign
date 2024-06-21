@@ -1,5 +1,6 @@
-from sqlmodel import Session, select
 from fastapi import HTTPException
+from sqlmodel import Session, select
+
 from app.models.models import Document, User
 from app.schemas.schemas import DocumentCreate, DocumentUpdate
 
@@ -18,7 +19,9 @@ def create_document(db: Session, *, obj_in: DocumentCreate) -> Document:
     return db_obj
 
 
-def update_document(db: Session, *, db_obj: Document, obj_in: DocumentUpdate) -> Document:
+def update_document(
+    db: Session, *, db_obj: Document, obj_in: DocumentUpdate
+) -> Document:
     if obj_in.title is not None:
         db_obj.title = obj_in.title
     if obj_in.status is not None:
@@ -47,7 +50,9 @@ def get_document_by_id(db: Session, document_id: int) -> Document:
     return document
 
 
-def get_documents_by_user(db: Session, user: User, skip: int, limit: int) -> list[Document]:
+def get_documents_by_user(
+    db: Session, user: User, skip: int, limit: int
+) -> list[Document]:
     statement = select(Document).offset(skip).limit(limit)
     if not user.is_superuser:
         statement = statement.where(Document.owner_id == user.id)

@@ -7,8 +7,10 @@ import string
 from datetime import datetime
 from pathlib import Path
 
+from sqlmodel import select
+
 import PyPDF2
-from fastapi import HTTPException, UploadFile
+from fastapi import HTTPException, UploadFile, status
 from jose import JWTError, jwt
 from reportlab.lib.colors import black
 from reportlab.lib.pagesizes import letter
@@ -18,8 +20,22 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
 from app.core.config import settings
-from app.models.models import FieldType
-from app.utils import send_email
+from app.crud import audit_log_crud, document_crud, signed_document_crud
+from app.models.models import (
+    AuditLogAction,
+    DocumentStatus,
+    FieldType,
+    RequestSignatoryLink,
+    Signatory,
+    SignatureRequest,
+    SignatureRequestStatus,
+)
+from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate
+from app.utils import (
+    send_email,
+    send_signature_request_email,
+    send_signature_request_notification_email,
+)
 
 # Register a handwriting-like font
 registerFont(TTFont("Handwriting", "static/fonts/Allura-Regular.ttf"))
@@ -260,3 +276,280 @@ def generate_pdf_hash(file_path):
     with open(file_path, "rb") as f:
         file_content = f.read()
     return hashlib.sha256(file_content).hexdigest()
+
+
+def handle_single_signatory(signature_request_data, db, request):
+    signatory = signature_request_data.signatories[0]
+    secure_link, token = generate_secure_link(
+        signature_request_data.expiry_date,
+        signature_request_data.id,
+        signatory.email,
+        [document.id for document in signature_request_data.documents],
+        signatory.id,
+        signature_request_data.require_otp,
+    )
+    send_email_and_update_status(
+        email=signatory.email,
+        link=secure_link,
+        message=signature_request_data.message,
+        documents=signature_request_data.documents,
+        db=db,
+        signature_request_data=signature_request_data,
+        request=request,
+        token=token,
+    )
+
+
+def handle_multiple_signatories(signature_request_data, db, request):
+    signature_request_data.signatories.sort(key=lambda s: s.signing_order)
+    if signature_request_data.ordered_signers:
+        first_signatory = signature_request_data.signatories[0]
+        secure_link, token = generate_secure_link(
+            signature_request_data.expiry_date,
+            signature_request_data.id,
+            first_signatory.email,
+            [document.id for document in signature_request_data.documents],
+            first_signatory.id,
+            signature_request_data.require_otp,
+        )
+        send_email_and_update_status(
+            email=first_signatory.email,
+            link=secure_link,
+            message=signature_request_data.message,
+            documents=signature_request_data.documents,
+            db=db,
+            signature_request_data=signature_request_data,
+            request=request,
+            token=token,
+        )
+    else:
+        for signatory in signature_request_data.signatories:
+            secure_link, token = generate_secure_link(
+                signature_request_data.expiry_date,
+                signature_request_data.id,
+                signatory.email,
+                [document.id for document in signature_request_data.documents],
+                signatory.id,
+                signature_request_data.require_otp,
+            )
+            send_email_and_update_status(
+                email=signatory.email,
+                link=secure_link,
+                message=signature_request_data.message,
+                documents=signature_request_data.documents,
+                db=db,
+                signature_request_data=signature_request_data,
+                request=request,
+                token=token,
+            )
+
+
+def send_email_and_update_status(
+    email, link, message, documents, db, signature_request_data, request, token
+):
+    email_response = send_signature_request_email(
+        email_to=email,
+        document_title="signature request",
+        link=link,
+        message=message,
+    )
+
+    if email_response and email_response.status_code == 250:
+        update_document_statuses(documents, db)
+        update_signature_request_status(signature_request_data, db, token, request)
+    else:
+        handle_email_failure(email_response)
+
+
+def update_document_statuses(documents, db):
+    for document_element in documents:
+        document = document_crud.get_document_by_id(db, document_element.id)
+        if document:
+            document.status = DocumentStatus.SENT_FOR_SIGNATURE
+            db.add(document)
+    db.commit()
+
+
+def update_signature_request_status(signature_request_data, db, token, request):
+    signature_request_data.status = SignatureRequestStatus.SENT
+    signature_request_data.token = token
+    db.add(signature_request_data)
+    db.commit()
+    db.refresh(signature_request_data)
+
+    audit_log_crud.create_audit_log(
+        db,
+        AuditLogCreate(
+            description="Signature request initiated",
+            ip_address=request.client.host,
+            action=AuditLogAction.SIGNATURE_REQUESTED,
+            signature_request_id=signature_request_data.id,
+        ),
+    )
+
+    send_notification_email(signature_request_data)
+
+
+def send_notification_email(signature_request_data):
+    notification_email_response = send_signature_request_notification_email(
+        signature_request_data.sender.email,
+        signature_request_data.name,
+        signature_request_data.id,
+        signature_request_data.status.value,
+    )
+
+    if (
+        notification_email_response is not None
+        and notification_email_response.status_code == 250
+    ):
+        logging.info("Notification email sent successfully.")
+    else:
+        error_detail = "Failed to send notification email due to server error."
+        if notification_email_response:
+            error_detail += f" Server responded with status: {notification_email_response.status_code}."
+        logging.error(error_detail)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=error_detail,
+        )
+
+
+def handle_email_failure(email_response):
+    error_message = f"""
+        Failed to send email: {email_response.status_text if email_response else 'No response'}
+    """
+    logging.error(error_message)
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=error_message,
+    )
+
+
+def get_signature_request(session, signature_request_id):
+    signature_request = session.get(SignatureRequest, signature_request_id)
+    if not signature_request:
+        raise HTTPException(status_code=404, detail="Signature request not found")
+    return signature_request
+
+
+def get_signatory(session, email, signature_request_id):
+    signatory = session.exec(
+        select(Signatory)
+        .join(RequestSignatoryLink)
+        .where(
+            Signatory.email == email,
+            RequestSignatoryLink.signature_request_id == signature_request_id,
+        )
+    ).first()
+    if not signatory:
+        raise HTTPException(status_code=404, detail="Signatory not found")
+    return signatory
+
+
+def verify_otp_code(email, otp, otp_store):
+    if email not in otp_store:
+        raise HTTPException(status_code=400, detail="OTP not found")
+    otp_data = otp_store[email]
+    if otp_data["expires"] < datetime.now():
+        del otp_store[email]
+        raise HTTPException(status_code=400, detail="OTP expired")
+    if otp_data["otp"] != otp:
+        raise HTTPException(status_code=400, detail="Invalid OTP")
+    del otp_store[email]
+
+
+def log_otp_verification(session, ip_address, signature_request_id, signatory_id):
+    audit_log_crud.create_audit_log(
+        session,
+        AuditLogCreate(
+            description="OTP verified",
+            ip_address=ip_address,
+            action=AuditLogAction.DOCUMENT_SIGNED,
+            signature_request_id=signature_request_id,
+            signatory_id=signatory_id,
+        ),
+    )
+
+
+def process_signatory_signature(
+    session, signatory, signature_request, ip_address, static_files_dir
+):
+    signatory.signed_at = datetime.now()
+    session.commit()
+
+    for document in signature_request.documents:
+        document_path = process_document_for_signatory(
+            session, document, signatory, ip_address, static_files_dir
+        )
+        if len(signature_request.signatories) == 1:
+            apply_pdf_security(str(document_path))
+
+
+def process_document_for_signatory(
+    session, document, signatory, ip_address, static_files_dir
+):
+    document.status = DocumentStatus.SIGNED
+    session.commit()
+
+    final_pdf_path = static_files_dir / "signed_documents" / f"{document.file}"
+    for field in signatory.fields:
+        if field.document_id == document.id:
+            add_fields_to_pdf(document.file, field, signatory, document.owner_id)
+
+    pdf_hash = generate_pdf_hash(str(final_pdf_path))
+    logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
+
+    document_signature_details = DocumentSignatureDetailsCreate(
+        document_id=document.id,
+        signed_hash=pdf_hash,
+        timestamp=datetime.now(),
+        ip_address=ip_address,
+    )
+    signed_document_crud.create_document_signature_details(
+        session, document_signature_details
+    )
+
+    return final_pdf_path
+
+
+def all_signatories_signed(signatories):
+    return all(signatory.signed_at is not None for signatory in signatories)
+
+
+def finalize_document(session, signature_request, ip_address, static_files_dir):
+    for document in signature_request.documents:
+        final_pdf_path = static_files_dir / "signed_documents" / f"{document.file}"
+        apply_pdf_security(str(final_pdf_path))
+        document.status = DocumentStatus.SIGNED
+        session.commit()
+
+        pdf_hash = generate_pdf_hash(str(final_pdf_path))
+        logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
+
+        document_signature_details = DocumentSignatureDetailsCreate(
+            document_id=document.id,
+            signed_hash=pdf_hash,
+            timestamp=datetime.now(),
+            ip_address=ip_address,
+        )
+        signed_document_crud.create_document_signature_details(
+            session, document_signature_details
+        )
+
+
+def send_final_notifications(signature_request, static_files_dir):
+    signed_documents = [
+        static_files_dir / "signed_documents" / f"{document.file}"
+        for document in signature_request.documents
+    ]
+    recipients = [signature_request.sender.email] + [
+        signatory.email for signatory in signature_request.signatories
+    ]
+    for recipient in recipients:
+        send_signature_request_notification_email(
+            email_to=recipient,
+            signature_request_name=signature_request.name,
+            signature_request_id=signature_request.id,
+            status=signature_request.status.value,
+            documents=signed_documents,
+        )

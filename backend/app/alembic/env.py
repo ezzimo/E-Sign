@@ -4,12 +4,20 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-
 from app.models.models import (  # noqa
-    User, Document, DocField, Radio, Signatory, ReminderSettings, SignatureRequest,
-    RequestDocumentLink, RequestSignatoryLink, AuditLog, Item
+    AuditLog,
+    DocField,
+    Document,
+    Item,
+    Radio,
+    ReminderSettings,
+    RequestDocumentLink,
+    RequestSignatoryLink,
+    Signatory,
+    SignatureRequest,
+    SQLModel,
+    User,
 )
-from app.models.models import SQLModel
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

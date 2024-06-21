@@ -35,8 +35,9 @@ class User(UserBase, table=True):
 # Enum definitions
 class DocumentStatus(enum.Enum):
     DRAFT = "draft"
-    SENT_FOR_SIGNATURE = "sent for signature"
+    SENT_FOR_SIGNATURE = "sent_for_signature"
     VIEWED = "viewed"
+    PARTIALLY_SIGNED = "partially_signed"
     SIGNED = "signed"
     REJECTED = "rejected"
 
@@ -53,6 +54,7 @@ class FieldType(enum.Enum):
 class SignatureRequestStatus(enum.Enum):
     DRAFT = "draft"
     SENT = "sent"
+    PARTIALLY_SIGNED = "partially_signed"
     COMPLETED = "completed"
     EXPIRED = "expired"
     CANCELED = "canceled"
@@ -178,6 +180,7 @@ class Signatory(BaseModel, table=True):
     signature_requests: list["SignatureRequest"] = Relationship(
         back_populates="signatories", link_model=RequestSignatoryLink
     )
+    audit_logs: list["AuditLog"] = Relationship(back_populates="signatory")
 
 
 class ReminderSettings(SQLModel, table=True):
@@ -233,9 +236,13 @@ class AuditLogBase(SQLModel):
 
 
 class AuditLog(AuditLogBase, table=True):
+    signatory_id: int = Field(default=None, foreign_key="signatory.id")
     signature_request_id: int = Field(default=None, foreign_key="signaturerequest.id")
 
     signature_request: Optional["SignatureRequest"] = Relationship(
+        back_populates="audit_logs"
+    )
+    signatory: Optional["Signatory"] = Relationship(
         back_populates="audit_logs"
     )
 

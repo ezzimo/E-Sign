@@ -1,6 +1,6 @@
+import logging
 import secrets
 import warnings
-import logging
 from typing import Annotated, Any, Literal
 
 from pydantic import (
@@ -89,13 +89,15 @@ class Settings(BaseSettings):
     @property
     def emails_enabled(self) -> bool:
         logging.info("enabled email")
-        return all([
-            self.SMTP_HOST,
-            self.SMTP_PORT,
-            self.EMAILS_FROM_EMAIL,
-            self.SMTP_USER,
-            self.SMTP_PASSWORD,
-        ])
+        return all(
+            [
+                self.SMTP_HOST,
+                self.SMTP_PORT,
+                self.EMAILS_FROM_EMAIL,
+                self.SMTP_USER,
+                self.SMTP_PASSWORD,
+            ]
+        )
 
     EMAIL_TEST_USER: str = "test@example.com"
     FIRST_SUPERUSER: str

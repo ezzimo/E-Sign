@@ -43,7 +43,7 @@ async def create_document(
 def read_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Get document details by ID, including download URL.
@@ -69,7 +69,7 @@ def read_document(
 def download_document(
     document_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     Download the PDF file by document ID.
@@ -81,7 +81,9 @@ def download_document(
     file_path = STATIC_FILES_DIR / f"{document.owner_id}_{document.file}"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path=file_path, filename=document.file, media_type="application/pdf")
+    return FileResponse(
+        path=file_path, filename=document.file, media_type="application/pdf"
+    )
 
 
 @router.get("/{document_id}/file", response_class=FileResponse)
