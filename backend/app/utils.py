@@ -145,14 +145,27 @@ def send_signature_request_notification_email(
     signature_request_name: str,
     signature_request_id: str,
     status: str,
-    documents: Optional[List[Path]] = None,  # Type hint corrected
+    documents: Optional[List[Path]] = None,
 ) -> emails.Message:
+    """
+    Send notification email about the signature request status update.
+
+    Args:
+        email_to (str): Recipient email address.
+        signature_request_name (str): Name of the signature request.
+        signature_request_id (str): ID of the signature request.
+        status (str): Status of the signature request.
+        documents (Optional[List[Path]]): List of document paths to attach.
+
+    Returns:
+        emails.Message: The email message object.
+    """
     subject = f"""Signature Request Status Update for \
     '{signature_request_name}' with id: '{signature_request_id}'"""
 
     # Prepare email attachments
     attachments = []
-    if documents is not None:  # Check if documents is not None before iterating
+    if documents is not None:
         for document_path in documents:
             with open(document_path, "rb") as f:
                 attachments.append((document_path.name, f.read(), "application/pdf"))
@@ -188,6 +201,17 @@ def send_signature_request_notification_email(
         </body>
     </html>
     """
+
+    # Create and send the email
+    message = emails.html(
+        subject=subject,
+        html=html_content,
+        mail_from=("Your Company Name", "no-reply@yourcompany.com"),
+    )
+
+    # Attach documents if any
+    for attachment in attachments:
+        message.attach(filename=attachment[0], content=attachment[1], mime_type=attachment[2])
 
     return send_email(
         email_to=email_to,

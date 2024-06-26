@@ -16,7 +16,6 @@
         linkElement.href = css_link;
         document.head.appendChild(linkElement);
     </script>
-    <link rel="stylesheet" href="{{ url_for('static', path='css/custom.css', _external=True, _scheme=request.url.scheme) }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.3.136/pdf_viewer.min.css" integrity="sha512-Cq5XgEsaLgxVXOIAn0dHWEksHM6X9POVKcaD1dGc37C6O+vWl5UIxtgC05JW9WnZA7jll4ouJ3zXDJ6/7RDX7g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     {% block title %}{% endblock %}

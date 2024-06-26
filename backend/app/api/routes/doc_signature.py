@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
 from app.api.deps import SessionDep
-from app.crud import audit_log_crud, signatory_crud, signed_document_crud
+from app.crud import audit_log_crud, signatory_crud
 from app.models.models import (
     AuditLogAction,
     Document,
@@ -22,14 +22,12 @@ from app.models.models import (
 )
 from app.schemas.schemas import (
     AuditLogCreate,
-    DocumentSignatureDetailsCreate,
     SignatoryUpdate,
 )
 from app.services.file_service import (
-    add_fields_to_pdf,
-    apply_pdf_security,
-    generate_pdf_hash,
+    send_next_ordered_signatory_email,
     send_otp_code,
+    send_remaining_signatories_email,
     verify_otp_code,
     verify_secure_link_token,
     get_signature_request,
@@ -58,6 +56,20 @@ STATIC_FILES_DIR = Path("/app/static/document_files")
 def access_document_with_token(
     *, session: SessionDep, token: str = Query(...), request: Request
 ):
+    """
+    Access document with a secure token and render the signing page.
+
+    Args:
+        session (Session): Database session dependency.
+        token (str): Secure token for accessing the document.
+        request (Request): FastAPI request object.
+
+    Returns:
+        HTMLResponse: Renders the signing page template.
+
+    Raises:
+        HTTPException: Various cases of invalid or expired token, missing data in payload, etc.
+    """
     payload = verify_secure_link_token(token)
     if payload is None:
         raise HTTPException(status_code=403, detail="Invalid or expired token")
@@ -68,6 +80,7 @@ def access_document_with_token(
     signature_request_id = payload.get("signature_request_id")
     require_otp = payload.get("require_otp")
 
+    # Validate payload data
     if document_ids is None:
         raise HTTPException(status_code=400, detail="No document id in the payload")
     if email is None:
@@ -81,6 +94,7 @@ def access_document_with_token(
     if require_otp is None:
         raise HTTPException(status_code=400, detail="No require_otp id in the payload")
 
+    # Fetch the signature request
     signature_request_statement = select(SignatureRequest).where(
         SignatureRequest.id == int(signature_request_id)
     )
@@ -112,19 +126,20 @@ def access_document_with_token(
             convert_pdf_to_images(STATIC_FILES_DIR / f"{document.file}", image_folder)
 
         # Ensure the images are already converted and available
-
         image_urls = [
             f"/api/v1/static/document_files/{document.owner_id}_{document.title}/page_{i}.png"
             for i in range(1, len(list(image_folder.glob("*.png"))) + 1)
         ]
         document_urls.append(image_urls)
 
+        # Update document status to VIEWED if not already
         if document.status != DocumentStatus.VIEWED:
             document.status = DocumentStatus.VIEWED
             session.add(document)
             session.commit()
             session.refresh(document)
 
+        # Log the document view
         audit_log_crud.create_audit_log(
             session,
             AuditLogCreate(
@@ -135,6 +150,7 @@ def access_document_with_token(
             ),
         )
 
+        # Send notification email
         send_signature_request_notification_email(
             signature_request.sender.email,
             signature_request.name,
@@ -142,6 +158,7 @@ def access_document_with_token(
             signature_request.status.value,
         )
 
+    # Fetch the signatory
     signatory_statement = select(Signatory).where(Signatory.id == int(signatory_id))
     signatory = session.exec(signatory_statement).first()
 
@@ -195,117 +212,40 @@ def verify_otp(
     otp: int | None = Form(None),
     signature_request_id: int = Form(...),
 ):
-    signature_request = session.get(SignatureRequest, signature_request_id)
-    if not signature_request:
-        raise HTTPException(status_code=404, detail="Signature request not found")
-
-    if signature_request.require_otp:
-        if email not in otp_store:
-            raise HTTPException(status_code=400, detail="OTP not found")
-        otp_data = otp_store[email]
-        if otp_data["expires"] < datetime.now():
-            del otp_store[email]
-            raise HTTPException(status_code=400, detail="OTP expired")
-        if otp_data["otp"] != otp:
-            raise HTTPException(status_code=400, detail="Invalid OTP")
-        del otp_store[email]
-
-        audit_log_crud.create_audit_log(
-            session,
-            AuditLogCreate(
-                description="OTP verified",
-                ip_address=request.client.host,
-                action=AuditLogAction.DOCUMENT_SIGNED,
-                signature_request_id=signature_request_id,
-            ),
-        )
-
-    signature_request.status = SignatureRequestStatus.COMPLETED
-    session.commit()
-
-    for document in signature_request.documents:
-        document.status = DocumentStatus.SIGNED
-        session.commit()
-
-        final_pdf_path = STATIC_FILES_DIR / "signed_documents" / f"{document.file}"
-        for signatory in signature_request.signatories:
-            for field in signatory.fields:
-                if field.document_id == document.id:
-                    add_fields_to_pdf(
-                        document.file, field, signatory, document.owner_id
-                    )
-        apply_pdf_security(str(final_pdf_path))
-
-        pdf_hash = generate_pdf_hash(str(final_pdf_path))
-        logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
-
-        document_signature_details = DocumentSignatureDetailsCreate(
-            document_id=document.id,
-            signed_hash=pdf_hash,
-            timestamp=datetime.now(),
-            ip_address=request.client.host,
-        )
-        signed_document_crud.create_document_signature_details(
-            session, document_signature_details
-        )
-
-    signed_documents = [final_pdf_path for document in signature_request.documents]
-    recipients = [signature_request.sender.email] + [
-        signatory.email for signatory in signature_request.signatories
-    ]
-    for recipient in recipients:
-        send_signature_request_notification_email(
-            email_to=recipient,
-            signature_request_name=signature_request.name,
-            signature_request_id=signature_request_id,
-            status=signature_request.status.value,
-            documents=signed_documents,
-        )
-
-    return JSONResponse(content={"message": "Document successfully signed!"})
-
-
-@router.post("/verify_otp/test", response_class=JSONResponse)
-def verify_otp_2(
-    request: Request,
-    session: SessionDep,
-    email: str = Form(...),
-    otp: int | None = Form(None),
-    signature_request_id: int = Form(...),
-):
     """
     Verify the OTP for a signatory and handle the signing process.
     """
+    logger.info("Starting OTP verification process")
+
     signature_request = get_signature_request(session, signature_request_id)
     signatory = get_signatory(session, email, signature_request_id)
     static_files_dir = STATIC_FILES_DIR
 
     if signature_request.require_otp:
+        logger.info(f"Verifying OTP for {email}")
         verify_otp_code(email, otp, otp_store)
-
         log_otp_verification(session, request.client.host, signature_request_id, signatory.id)
 
+    logger.info(f"Processing signature for signatory {signatory.id}")
     process_signatory_signature(
         session, signatory, signature_request, request.client.host, static_files_dir
     )
 
     if all_signatories_signed(signature_request.signatories):
+        logger.info("All signatories have signed. Finalizing document.")
         finalize_document(
             session, signature_request, request.client.host, static_files_dir
         )
         send_final_notifications(signature_request, static_files_dir)
     else:
-        send_signature_request_notification_email(
-            email_to=signatory.email,
-            signature_request_name=signature_request.name,
-            signature_request_id=signature_request.id,
-            status=signature_request.status.value,
-            documents=[
-                STATIC_FILES_DIR / "signed_documents" / f"{document.file}"
-                for document in signature_request.documents
-            ],
-        )
+        if signature_request.ordered_signers:
+            logger.info("Signatories are ordered. Sending email to next signatory.")
+            send_next_ordered_signatory_email(signature_request, session, request)
+        else:
+            logger.info("Signatories are not ordered. Sending email to remaining signatories.")
+            send_remaining_signatories_email(signature_request, session, request)
 
+    logger.info("OTP verification and signing process completed successfully")
     return JSONResponse(content={"message": "Document successfully signed!"})
 
 

@@ -7,6 +7,7 @@ import string
 from datetime import datetime
 from pathlib import Path
 
+from app.services.file_utils import convert_pdf_to_images
 from sqlmodel import select
 
 import PyPDF2
@@ -433,32 +434,41 @@ def get_signature_request(session, signature_request_id):
 
 
 def get_signatory(session, email, signature_request_id):
-    signatory = session.exec(
+    statement = (
         select(Signatory)
         .join(RequestSignatoryLink)
         .where(
             Signatory.email == email,
             RequestSignatoryLink.signature_request_id == signature_request_id,
         )
-    ).first()
+    )
+    signatory = session.exec(statement).first()
     if not signatory:
         raise HTTPException(status_code=404, detail="Signatory not found")
     return signatory
 
 
 def verify_otp_code(email, otp, otp_store):
+    logger.info(f"Verifying OTP for email: {email}")
     if email not in otp_store:
+        logger.error("OTP not found for email: {email}")
         raise HTTPException(status_code=400, detail="OTP not found")
     otp_data = otp_store[email]
     if otp_data["expires"] < datetime.now():
         del otp_store[email]
+        logger.error("OTP expired for email: {email}")
         raise HTTPException(status_code=400, detail="OTP expired")
     if otp_data["otp"] != otp:
+        logger.error("Invalid OTP for email: {email}")
         raise HTTPException(status_code=400, detail="Invalid OTP")
     del otp_store[email]
+    logger.info("OTP verified successfully for email: {email}")
 
 
 def log_otp_verification(session, ip_address, signature_request_id, signatory_id):
+    logger.info(
+        f"Logging OTP verification for signatory {signatory_id} in signature request {signature_request_id}"
+    )
     audit_log_crud.create_audit_log(
         session,
         AuditLogCreate(
@@ -474,6 +484,7 @@ def log_otp_verification(session, ip_address, signature_request_id, signatory_id
 def process_signatory_signature(
     session, signatory, signature_request, ip_address, static_files_dir
 ):
+    logger.info(f"Processing signature for signatory {signatory.id}")
     signatory.signed_at = datetime.now()
     session.commit()
 
@@ -483,11 +494,13 @@ def process_signatory_signature(
         )
         if len(signature_request.signatories) == 1:
             apply_pdf_security(str(document_path))
+    logger.info(f"Signature processed for signatory {signatory.id}")
 
 
 def process_document_for_signatory(
     session, document, signatory, ip_address, static_files_dir
 ):
+    logger.info(f"Processing document {document.id} for signatory {signatory.id}")
     document.status = DocumentStatus.SIGNED
     session.commit()
 
@@ -495,6 +508,17 @@ def process_document_for_signatory(
     for field in signatory.fields:
         if field.document_id == document.id:
             add_fields_to_pdf(document.file, field, signatory, document.owner_id)
+
+    # Convert the updated PDF to images and replace old images
+    folder_name = f"{document.owner_id}_{document.title}"
+    image_folder = static_files_dir / folder_name
+    if image_folder.exists():
+        # Remove old images
+        for img_file in image_folder.glob("*.png"):
+            img_file.unlink()
+
+    # Convert the updated PDF to images
+    convert_pdf_to_images(final_pdf_path, image_folder)
 
     pdf_hash = generate_pdf_hash(str(final_pdf_path))
     logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
@@ -513,15 +537,18 @@ def process_document_for_signatory(
 
 
 def all_signatories_signed(signatories):
-    return all(signatory.signed_at is not None for signatory in signatories)
+    signed_status = all(signatory.signed_at is not None for signatory in signatories)
+    logger.info(f"All signatories signed status: {signed_status}")
+    return signed_status
 
 
 def finalize_document(session, signature_request, ip_address, static_files_dir):
+    signature_request.status = SignatureRequestStatus.SIGNED
+    logger.info(f"Finalizing document for signature request {signature_request.id}")
     for document in signature_request.documents:
         final_pdf_path = static_files_dir / "signed_documents" / f"{document.file}"
         apply_pdf_security(str(final_pdf_path))
         document.status = DocumentStatus.SIGNED
-        session.commit()
 
         pdf_hash = generate_pdf_hash(str(final_pdf_path))
         logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
@@ -535,9 +562,12 @@ def finalize_document(session, signature_request, ip_address, static_files_dir):
         signed_document_crud.create_document_signature_details(
             session, document_signature_details
         )
+    session.commit()
+    logger.info(f"Document finalized for signature request {signature_request.id}")
 
 
 def send_final_notifications(signature_request, static_files_dir):
+    logger.info(f"Sending final notifications for signature request {signature_request.id}")
     signed_documents = [
         static_files_dir / "signed_documents" / f"{document.file}"
         for document in signature_request.documents
@@ -553,3 +583,69 @@ def send_final_notifications(signature_request, static_files_dir):
             status=signature_request.status.value,
             documents=signed_documents,
         )
+    logger.info(f"Final notifications sent for signature request {signature_request.id}")
+
+
+def send_next_ordered_signatory_email(signature_request, session, request):
+    logger.info(f"Sending email to next ordered signatory for signature request {signature_request.id}")
+    for signatory in sorted(signature_request.signatories, key=lambda s: s.signing_order):
+        if not signatory.signed_at:
+            secure_link, token = generate_secure_link(
+                signature_request.expiry_date,
+                signature_request.id,
+                signatory.email,
+                [document.id for document in signature_request.documents],
+                signatory.id,
+                signature_request.require_otp,
+            )
+            send_email_and_update_status(
+                email=signatory.email,
+                link=secure_link,
+                message=signature_request.message,
+                documents=signature_request.documents,
+                db=session,
+                signature_request_data=signature_request,
+                request=request,
+                token=token,
+            )
+            break
+
+    signature_request.status = SignatureRequestStatus.PARTIALLY_SIGNED
+    for document in signature_request.documents:
+        document.status = DocumentStatus.PARTIALLY_SIGNED
+        session.add(document)
+    session.add(signature_request)
+    session.commit()
+    logger.info(f"Email sent to next ordered signatory for signature request {signature_request.id}")
+
+
+def send_remaining_signatories_email(signature_request, session, request):
+    logger.info(f"Sending email to remaining signatories for signature request {signature_request.id}")
+    for signatory in signature_request.signatories:
+        if not signatory.signed_at:
+            secure_link, token = generate_secure_link(
+                signature_request.expiry_date,
+                signature_request.id,
+                signatory.email,
+                [document.id for document in signature_request.documents],
+                signatory.id,
+                signature_request.require_otp,
+            )
+            send_email_and_update_status(
+                email=signatory.email,
+                link=secure_link,
+                message=signature_request.message,
+                documents=signature_request.documents,
+                db=session,
+                signature_request_data=signature_request,
+                request=request,
+                token=token,
+            )
+
+    signature_request.status = SignatureRequestStatus.PARTIALLY_SIGNED
+    for document in signature_request.documents:
+        document.status = DocumentStatus.PARTIALLY_SIGNED
+        session.add(document)
+    session.add(signature_request)
+    session.commit()
+    logger.info(f"Emails sent to remaining signatories for signature request {signature_request.id}")

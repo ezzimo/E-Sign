@@ -97,7 +97,9 @@
 
            const email = "{{ email }}";
            const signatureRequestId = "{{ signature_request_id }}";
-           const requireOtp = "{{ require_otp|tojson }}";
+           const str_requireOtp = "{{ require_otp|tojson|safe }}";
+           const requireOtp = (str_requireOtp === 'true');
+           console.log("this is the otp status", requireOtp);
 
           initializeSignaturePage(email, signatureRequestId, requireOtp);
  };
