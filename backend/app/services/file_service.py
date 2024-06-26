@@ -34,7 +34,7 @@ from app.models.models import (
 from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate
 from app.utils import (
     send_email,
-    send_signature_request_email,
+    # send_signature_request_email,
     send_signature_request_notification_email,
 )
 
@@ -348,6 +348,7 @@ def handle_multiple_signatories(signature_request_data, db, request):
 def send_email_and_update_status(
     email, link, message, documents, db, signature_request_data, request, token
 ):
+    """
     email_response = send_signature_request_email(
         email_to=email,
         document_title="signature request",
@@ -360,6 +361,9 @@ def send_email_and_update_status(
         update_signature_request_status(signature_request_data, db, token, request)
     else:
         handle_email_failure(email_response)
+    """
+    update_document_statuses(documents, db)
+    update_signature_request_status(signature_request_data, db, token, request)
 
 
 def update_document_statuses(documents, db):
