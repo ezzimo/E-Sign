@@ -7,9 +7,6 @@ import string
 from datetime import datetime
 from pathlib import Path
 
-from app.services.file_utils import convert_pdf_to_images
-from sqlmodel import select
-
 import PyPDF2
 from fastapi import HTTPException, UploadFile, status
 from jose import JWTError, jwt
@@ -19,6 +16,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfbase.pdfmetrics import registerFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+from sqlmodel import select
 
 from app.core.config import settings
 from app.crud import audit_log_crud, document_crud, signed_document_crud
@@ -32,9 +30,9 @@ from app.models.models import (
     SignatureRequestStatus,
 )
 from app.schemas.schemas import AuditLogCreate, DocumentSignatureDetailsCreate
-from app.utils import (
+from app.services.file_utils import convert_pdf_to_images
+from app.utils import (  # send_signature_request_email,
     send_email,
-    # send_signature_request_email,
     send_signature_request_notification_email,
 )
 
@@ -571,7 +569,9 @@ def finalize_document(session, signature_request, ip_address, static_files_dir):
 
 
 def send_final_notifications(signature_request, static_files_dir):
-    logger.info(f"Sending final notifications for signature request {signature_request.id}")
+    logger.info(
+        f"Sending final notifications for signature request {signature_request.id}"
+    )
     signed_documents = [
         static_files_dir / "signed_documents" / f"{document.file}"
         for document in signature_request.documents
@@ -587,12 +587,18 @@ def send_final_notifications(signature_request, static_files_dir):
             status=signature_request.status.value,
             documents=signed_documents,
         )
-    logger.info(f"Final notifications sent for signature request {signature_request.id}")
+    logger.info(
+        f"Final notifications sent for signature request {signature_request.id}"
+    )
 
 
 def send_next_ordered_signatory_email(signature_request, session, request):
-    logger.info(f"Sending email to next ordered signatory for signature request {signature_request.id}")
-    for signatory in sorted(signature_request.signatories, key=lambda s: s.signing_order):
+    logger.info(
+        f"Sending email to next ordered signatory for signature request {signature_request.id}"
+    )
+    for signatory in sorted(
+        signature_request.signatories, key=lambda s: s.signing_order
+    ):
         if not signatory.signed_at:
             secure_link, token = generate_secure_link(
                 signature_request.expiry_date,
@@ -620,11 +626,15 @@ def send_next_ordered_signatory_email(signature_request, session, request):
         session.add(document)
     session.add(signature_request)
     session.commit()
-    logger.info(f"Email sent to next ordered signatory for signature request {signature_request.id}")
+    logger.info(
+        f"Email sent to next ordered signatory for signature request {signature_request.id}"
+    )
 
 
 def send_remaining_signatories_email(signature_request, session, request):
-    logger.info(f"Sending email to remaining signatories for signature request {signature_request.id}")
+    logger.info(
+        f"Sending email to remaining signatories for signature request {signature_request.id}"
+    )
     for signatory in signature_request.signatories:
         if not signatory.signed_at:
             secure_link, token = generate_secure_link(
@@ -652,4 +662,6 @@ def send_remaining_signatories_email(signature_request, session, request):
         session.add(document)
     session.add(signature_request)
     session.commit()
-    logger.info(f"Emails sent to remaining signatories for signature request {signature_request.id}")
+    logger.info(
+        f"Emails sent to remaining signatories for signature request {signature_request.id}"
+    )

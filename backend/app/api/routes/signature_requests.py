@@ -39,9 +39,7 @@ from app.services.file_service import (
     handle_multiple_signatories,
     handle_single_signatory,
 )
-from app.utils import (
-    send_signature_request_email,
-)
+from app.utils import send_signature_request_email
 
 # Create a logger for your application
 logging.basicConfig(

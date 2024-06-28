@@ -211,7 +211,9 @@ def send_signature_request_notification_email(
 
     # Attach documents if any
     for attachment in attachments:
-        message.attach(filename=attachment[0], content=attachment[1], mime_type=attachment[2])
+        message.attach(
+            filename=attachment[0], content=attachment[1], mime_type=attachment[2]
+        )
 
     return send_email(
         email_to=email_to,

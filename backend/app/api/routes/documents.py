@@ -1,14 +1,14 @@
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_db
 from app.crud import document_crud
-from app.models.models import Document, User
+from app.models.models import DocField, Document, User
 from app.schemas.schemas import DocumentCreate, DocumentOut, DocumentUpdate
 from app.services.file_service import save_file
 
@@ -78,7 +78,7 @@ def download_document(
     if not current_user.is_superuser and document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    file_path = STATIC_FILES_DIR / f"{document.owner_id}_{document.file}"
+    file_path = STATIC_FILES_DIR / f"{document.file}"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(
@@ -96,12 +96,12 @@ def get_document_file(
     if not current_user.is_superuser and document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    file_path = STATIC_FILES_DIR / f"{document.owner_id}_{document.file}"
+    file_path = STATIC_FILES_DIR / f"{document.file}"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(
-        path=file_path, filename=file_path.name, media_type="application/pdf"
+        path=file_path, filename=document.title, media_type="application/pdf"
     )
 
 
@@ -124,6 +124,7 @@ def read_documents(
             updated_at=doc.updated_at,
             owner=doc.owner,
             file_url=doc.file_url,
+            signature_details=doc.signature_details,
         )
         results.append(doc_out)
     return results
@@ -132,9 +133,9 @@ def read_documents(
 @router.put("/{document_id}", response_model=DocumentOut)
 async def update_document(
     document_id: int,
-    title: Optional[str] = Form(None),
-    status: Optional[str] = Form(None),
-    new_file: Optional[UploadFile] = File(None),
+    title: str | None = Form(None),
+    status: str | None = Form(None),
+    new_file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -177,6 +178,12 @@ def delete_document(
         raise HTTPException(status_code=404, detail="Document not found")
     if not current_user.is_superuser and document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    # Manually delete related DocumentSignatureDetails records
+    document_fields_statement = select(DocField).filter_by(document_id=document_id)
+    document_fields = db.exec(document_fields_statement)
+    for field in document_fields:
+        db.delete(field)
 
     db.delete(document)
     db.commit()

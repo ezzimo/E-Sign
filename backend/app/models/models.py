@@ -24,12 +24,18 @@ class User(UserBase, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
 
-    documents: list["Document"] = Relationship(back_populates="owner")
+    documents: list["Document"] = Relationship(
+        back_populates="owner",
+        sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
+    )
     signatories: list["Signatory"] = Relationship(
         back_populates="creator",
         sa_relationship_kwargs={"foreign_keys": "Signatory.creator_id"},
     )
-    requests: list["SignatureRequest"] = Relationship(back_populates="sender")
+    requests: list["SignatureRequest"] = Relationship(
+        sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
+        back_populates="sender",
+    )
 
 
 # Enum definitions
@@ -97,7 +103,8 @@ class Document(BaseModel, table=True):
         back_populates="documents", link_model=RequestDocumentLink
     )
     signature_details: Optional["DocumentSignatureDetails"] = Relationship(
-        back_populates="document"
+        back_populates="document",
+        sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
     )
 
 
@@ -129,7 +136,7 @@ class DocField(BaseModel, table=True):
     mention: str | None = None
     name: str | None = None
     checked: bool | None = None
-    document_id: int = Field(foreign_key="document.id")
+    document_id: int | None = Field(foreign_key="document.id")
     signature_request_id: int | None = Field(foreign_key="signaturerequest.id")
     signer_id: int | None = Field(default=None, foreign_key="signatory.id")
     max_length: int | None = None
@@ -138,7 +145,10 @@ class DocField(BaseModel, table=True):
     text: str | None = None
 
     signatory: Optional["Signatory"] = Relationship(back_populates="fields")
-    radios: list["Radio"] = Relationship(back_populates="doc_field")
+    radios: list["Radio"] = Relationship(
+        back_populates="doc_field",
+        sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
+    )
 
 
 class Radio(SQLModel, table=True):
@@ -176,7 +186,10 @@ class Signatory(BaseModel, table=True):
         sa_relationship_kwargs={"foreign_keys": "Signatory.creator_id"},
         back_populates="signatories",
     )
-    fields: list[DocField] = Relationship(back_populates="signatory")
+    fields: list[DocField] = Relationship(
+        back_populates="signatory",
+        sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
+    )
     signature_requests: list["SignatureRequest"] = Relationship(
         back_populates="signatories", link_model=RequestSignatoryLink
     )
@@ -213,10 +226,17 @@ class SignatureRequest(BaseModel, table=True):
         back_populates="signature_requests", link_model=RequestDocumentLink
     )
     signatories: list[Signatory] = Relationship(
-        back_populates="signature_requests", link_model=RequestSignatoryLink
+        back_populates="signature_requests",
+        link_model=RequestSignatoryLink,
     )
-    audit_logs: list["AuditLog"] = Relationship(back_populates="signature_request")
-    reminder_settings: ReminderSettings | None = Relationship(back_populates="request")
+    audit_logs: list["AuditLog"] = Relationship(
+        back_populates="signature_request",
+        sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
+    )
+    reminder_settings: ReminderSettings | None = Relationship(
+        back_populates="request",
+        sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
+    )
 
 
 class AuditLogAction(str, Enum):
@@ -236,15 +256,13 @@ class AuditLogBase(SQLModel):
 
 
 class AuditLog(AuditLogBase, table=True):
-    signatory_id: int = Field(default=None, foreign_key="signatory.id")
+    signatory_id: int | None = Field(default=None, foreign_key="signatory.id")
     signature_request_id: int = Field(default=None, foreign_key="signaturerequest.id")
 
     signature_request: Optional["SignatureRequest"] = Relationship(
         back_populates="audit_logs"
     )
-    signatory: Optional["Signatory"] = Relationship(
-        back_populates="audit_logs"
-    )
+    signatory: Optional["Signatory"] = Relationship(back_populates="audit_logs")
 
 
 # Shared properties

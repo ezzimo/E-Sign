@@ -20,23 +20,20 @@ from app.models.models import (
     SignatureRequest,
     SignatureRequestStatus,
 )
-from app.schemas.schemas import (
-    AuditLogCreate,
-    SignatoryUpdate,
-)
+from app.schemas.schemas import AuditLogCreate, SignatoryUpdate
 from app.services.file_service import (
+    all_signatories_signed,
+    finalize_document,
+    get_signatory,
+    get_signature_request,
+    log_otp_verification,
+    process_signatory_signature,
+    send_final_notifications,
     send_next_ordered_signatory_email,
     send_otp_code,
     send_remaining_signatories_email,
     verify_otp_code,
     verify_secure_link_token,
-    get_signature_request,
-    get_signatory,
-    log_otp_verification,
-    process_signatory_signature,
-    all_signatories_signed,
-    finalize_document,
-    send_final_notifications,
 )
 from app.services.file_utils import convert_pdf_to_images
 from app.utils import send_signature_request_notification_email
@@ -224,7 +221,9 @@ def verify_otp(
     if signature_request.require_otp:
         logger.info(f"Verifying OTP for {email}")
         verify_otp_code(email, otp, otp_store)
-        log_otp_verification(session, request.client.host, signature_request_id, signatory.id)
+        log_otp_verification(
+            session, request.client.host, signature_request_id, signatory.id
+        )
 
     logger.info(f"Processing signature for signatory {signatory.id}")
     process_signatory_signature(
@@ -242,7 +241,9 @@ def verify_otp(
             logger.info("Signatories are ordered. Sending email to next signatory.")
             send_next_ordered_signatory_email(signature_request, session, request)
         else:
-            logger.info("Signatories are not ordered. Sending email to remaining signatories.")
+            logger.info(
+                "Signatories are not ordered. Sending email to remaining signatories."
+            )
             send_remaining_signatories_email(signature_request, session, request)
 
     logger.info("OTP verification and signing process completed successfully")
