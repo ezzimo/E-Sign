@@ -4,12 +4,6 @@ import {
 	MenuButton,
 	MenuItem,
 	MenuList,
-	Modal,
-	ModalBody,
-	ModalCloseButton,
-	ModalContent,
-	ModalHeader,
-	ModalOverlay,
 	useDisclosure,
 	useToast,
 } from "@chakra-ui/react";
@@ -22,11 +16,11 @@ import { SignatureRequestRead } from "../../client/models/SignatureRequestRead";
 import { DocumentsService } from "../../client/services/DocumentsService";
 import { UsersService } from "../../client/services/UsersService";
 import EditUser from "../Admin/EditUser";
-import DocumentViewer from "../Documents/DocumentViewer";
 import EditDocument from "../Documents/Editdocument";
 import EditItem from "../Items/EditItem";
 import DeleteConfirmation from "../UserSettings/DeleteConfirmation";
 import DeleteAlert from "./DeleteAlert";
+import DocumentModal from "../Documents/DocumentModal";
 
 interface ActionsMenuProps {
 	type: string;
@@ -40,9 +34,7 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
 	const viewModal = useDisclosure();
 	const toast = useToast();
 
-	const [documentDetails, setDocumentDetails] = useState<DocumentOut | null>(
-		null,
-	);
+	const [documentDetails, setDocumentDetails] = useState<DocumentOut | null>(null);
 	const [fileBlob, setFileBlob] = useState<Blob | null>(null);
 
 	const handleDelete = async () => {
@@ -84,7 +76,8 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
 
 	const handleViewDocument = async () => {
 		try {
-			const details = await DocumentsService.getDocumentFile({
+			// Fetch document details
+			const details = await DocumentsService.readDocument({
 				documentId: value.id as number,
 			});
 			setDocumentDetails(details);
@@ -189,22 +182,12 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
 				{renderDeleteModal()}
 			</Menu>
 
-			<Modal isOpen={viewModal.isOpen} onClose={viewModal.onClose} size="xl">
-				<ModalOverlay />
-				<ModalContent>
-					<ModalHeader>View Document</ModalHeader>
-					<ModalCloseButton />
-					<ModalBody>
-						{type === "Document" && documentDetails && fileBlob && (
-							<DocumentViewer
-								documentDetails={documentDetails}
-								fileBlob={fileBlob}
-								fileType="application/pdf"
-							/>
-						)}
-					</ModalBody>
-				</ModalContent>
-			</Modal>
+			<DocumentModal
+				isOpen={viewModal.isOpen}
+				onClose={viewModal.onClose}
+				documentDetails={documentDetails}
+				fileBlob={fileBlob}
+			/>
 		</>
 	);
 };

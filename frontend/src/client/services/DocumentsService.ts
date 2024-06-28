@@ -172,6 +172,7 @@ export class DocumentsService {
             path: {
                 'document_id': documentId,
             },
+            responseType: 'blob',
             errors: {
                 422: `Validation Error`,
             },

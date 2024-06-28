@@ -213,6 +213,7 @@ export const sendRequest = async <T>(
         method: options.method,
         withCredentials: config.WITH_CREDENTIALS,
         cancelToken: source.token,
+        responseType: options.responseType,
     };
 
     onCancel(() => source.cancel('The user aborted a request.'));

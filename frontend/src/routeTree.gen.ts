@@ -16,11 +16,11 @@ import { Route as RecoverPasswordImport } from './routes/recover-password'
 import { Route as LoginImport } from './routes/login'
 import { Route as LayoutImport } from './routes/_layout'
 import { Route as LayoutIndexImport } from './routes/_layout/index'
+import { Route as LayoutSignaturerequestsImport } from './routes/_layout/signature_requests'
 import { Route as LayoutSettingsImport } from './routes/_layout/settings'
 import { Route as LayoutItemsImport } from './routes/_layout/items'
 import { Route as LayoutDocumentsImport } from './routes/_layout/documents'
-import { Route as LayoutSignatureRequestsImport } from './routes/_layout/signature_requests'
-import { Route as LayoutCreateSignatureRequestImport } from './routes/_layout/create_signature_request'
+import { Route as LayoutCreatesignaturerequestImport } from './routes/_layout/create_signature_request'
 import { Route as LayoutAdminImport } from './routes/_layout/admin'
 
 // Create/Update Routes
@@ -50,6 +50,11 @@ const LayoutIndexRoute = LayoutIndexImport.update({
   getParentRoute: () => LayoutRoute,
 } as any)
 
+const LayoutSignaturerequestsRoute = LayoutSignaturerequestsImport.update({
+  path: '/signature_requests',
+  getParentRoute: () => LayoutRoute,
+} as any)
+
 const LayoutSettingsRoute = LayoutSettingsImport.update({
   path: '/settings',
   getParentRoute: () => LayoutRoute,
@@ -65,15 +70,11 @@ const LayoutDocumentsRoute = LayoutDocumentsImport.update({
   getParentRoute: () => LayoutRoute,
 } as any)
 
-const LayoutSignatureRequestsRoute = LayoutSignatureRequestsImport.update({
-  path: '/signature_requests',
-  getParentRoute: () => LayoutRoute,
-} as any)
-
-const LayoutCreateSignatureRequestRoute = LayoutCreateSignatureRequestImport.update({
-  path: '/new_signature_requests',
-  getParentRoute: () => LayoutRoute,
-} as any)
+const LayoutCreatesignaturerequestRoute =
+  LayoutCreatesignaturerequestImport.update({
+    path: '/create_signature_request',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 
 const LayoutAdminRoute = LayoutAdminImport.update({
   path: '/admin',
@@ -104,16 +105,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminImport
       parentRoute: typeof LayoutImport
     }
+    '/_layout/create_signature_request': {
+      preLoaderRoute: typeof LayoutCreatesignaturerequestImport
+      parentRoute: typeof LayoutImport
+    }
     '/_layout/documents': {
       preLoaderRoute: typeof LayoutDocumentsImport
-      parentRoute: typeof LayoutImport
-    }
-    '/_layout/signature_requests': {
-      preLoaderRoute: typeof LayoutSignatureRequestsImport
-      parentRoute: typeof LayoutImport
-    }
-    '/_layout/new_signature_requests': {
-      preLoaderRoute: typeof LayoutCreateSignatureRequestImport
       parentRoute: typeof LayoutImport
     }
     '/_layout/items': {
@@ -122,6 +119,10 @@ declare module '@tanstack/react-router' {
     }
     '/_layout/settings': {
       preLoaderRoute: typeof LayoutSettingsImport
+      parentRoute: typeof LayoutImport
+    }
+    '/_layout/signature_requests': {
+      preLoaderRoute: typeof LayoutSignaturerequestsImport
       parentRoute: typeof LayoutImport
     }
     '/_layout/': {
@@ -136,11 +137,11 @@ declare module '@tanstack/react-router' {
 export const routeTree = rootRoute.addChildren([
   LayoutRoute.addChildren([
     LayoutAdminRoute,
+    LayoutCreatesignaturerequestRoute,
     LayoutDocumentsRoute,
-    LayoutSignatureRequestsRoute,
-    LayoutCreateSignatureRequestRoute,
     LayoutItemsRoute,
     LayoutSettingsRoute,
+    LayoutSignaturerequestsRoute,
     LayoutIndexRoute,
   ]),
   LoginRoute,
