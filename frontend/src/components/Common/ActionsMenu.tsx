@@ -38,157 +38,164 @@ const ActionsMenu: React.FC<ActionsMenuProps> = ({ type, value, disabled }) => {
 	const [fileBlob, setFileBlob] = useState<Blob | null>(null);
 
 	const handleDelete = async () => {
-		try {
-			if (type === "Document") {
-				await DocumentsService.deleteDocument({
-					documentId: value.id as number,
-				});
-				toast({
-					title: "Document deleted.",
-					description: "The document has been deleted successfully.",
-					status: "success",
-					duration: 5000,
-					isClosable: true,
-				});
-			} else if (type === "User") {
-				await UsersService.deleteUser({ userId: value.id as number });
-				toast({
-					title: "User deleted.",
-					description: "The user has been deleted successfully.",
-					status: "success",
-					duration: 5000,
-					isClosable: true,
-				});
+			try {
+					if (type === "Document") {
+							await DocumentsService.deleteDocument({
+									documentId: value.id as number,
+							});
+							toast({
+									title: "Document deleted.",
+									description: "The document has been deleted successfully.",
+									status: "success",
+									duration: 5000,
+									isClosable: true,
+							});
+					} else if (type === "User") {
+							await UsersService.deleteUser({ userId: value.id as number });
+							toast({
+									title: "User deleted.",
+									description: "The user has been deleted successfully.",
+									status: "success",
+									duration: 5000,
+									isClosable: true,
+							});
+					}
+					deleteModal.onClose();
+			} catch (error) {
+					toast({
+							title: `Error deleting ${type.toLowerCase()}.`,
+							description: `An error occurred while deleting the ${type.toLowerCase()}.`,
+							status: "error",
+							duration: 5000,
+							isClosable: true,
+					});
+			} finally {
+					deleteModal.onClose();
 			}
-			deleteModal.onClose();
-		} catch (error) {
-			toast({
-				title: `Error deleting ${type.toLowerCase()}.`,
-				description: `An error occurred while deleting the ${type.toLowerCase()}.`,
-				status: "error",
-				duration: 5000,
-				isClosable: true,
-			});
-		} finally {
-			deleteModal.onClose();
-		}
 	};
 
 	const handleViewDocument = async () => {
-		try {
-			// Fetch document details
-			const details = await DocumentsService.readDocument({
-				documentId: value.id as number,
-			});
-			setDocumentDetails(details);
+			try {
+					// Fetch document details
+					const details = await DocumentsService.readDocument({
+							documentId: value.id as number,
+					});
+					setDocumentDetails(details);
 
-			// Fetch the document file blob
-			const file = await DocumentsService.getDocumentFile({
-				documentId: value.id as number,
-			});
-			setFileBlob(file);
+					// Fetch the document file blob
+					const file = await DocumentsService.getDocumentFile({
+							documentId: value.id as number,
+					});
+					setFileBlob(file);
 
-			viewModal.onOpen();
-		} catch (error) {
-			toast({
-				title: "Error viewing document.",
-				description: "An error occurred while fetching the document.",
-				status: "error",
-				duration: 5000,
-				isClosable: true,
-			});
-		}
+					viewModal.onOpen();
+			} catch (error) {
+					toast({
+							title: "Error viewing document.",
+							description: "An error occurred while fetching the document.",
+							status: "error",
+							duration: 5000,
+							isClosable: true,
+					});
+			}
 	};
 
 	const renderEditModal = () => {
-		switch (type) {
-			case "User":
-				return (
-					<EditUser
-						user={value as UserOut}
-						isOpen={editModal.isOpen}
-						onClose={editModal.onClose}
-					/>
-				);
-			case "Item":
-				return (
-					<EditItem
-						item={value as ItemOut}
-						isOpen={editModal.isOpen}
-						onClose={editModal.onClose}
-					/>
-				);
-			case "Document":
-				return (
-					<EditDocument
-						document={value as DocumentOut}
-						isOpen={editModal.isOpen}
-						onClose={editModal.onClose}
-					/>
-				);
-			default:
-				return null;
-		}
+			switch (type) {
+					case "User":
+							return (
+									<EditUser
+											user={value as UserOut}
+											isOpen={editModal.isOpen}
+											onClose={editModal.onClose}
+									/>
+							);
+					case "Item":
+							return (
+									<EditItem
+											item={value as ItemOut}
+											isOpen={editModal.isOpen}
+											onClose={editModal.onClose}
+									/>
+							);
+					case "Document":
+							return (
+									<EditDocument
+											document={value as DocumentOut}
+											isOpen={editModal.isOpen}
+											onClose={editModal.onClose}
+									/>
+							);
+					default:
+							return null;
+			}
 	};
 
 	const renderDeleteModal = () => {
-		if (type === "User") {
+			if (type === "User") {
+					return (
+							<DeleteConfirmation
+									userId={value.id as number} // Pass the user ID here
+									isOpen={deleteModal.isOpen}
+									onClose={deleteModal.onClose}
+							/>
+					);
+			}
 			return (
-				<DeleteConfirmation
-					userId={value.id as number} // Pass the user ID here
-					isOpen={deleteModal.isOpen}
-					onClose={deleteModal.onClose}
-				/>
+					<DeleteAlert
+							isOpen={deleteModal.isOpen}
+							onClose={deleteModal.onClose}
+							id={Number(value.id)}
+							type={type}
+							onDelete={handleDelete}
+					/>
 			);
-		}
-		return (
-			<DeleteAlert
-				isOpen={deleteModal.isOpen}
-				onClose={deleteModal.onClose}
-				id={Number(value.id)}
-				type={type}
-				onDelete={handleDelete}
-			/>
-		);
+	};
+
+	const isDeletableDocument = () => {
+			if (type !== "Document") return true;
+			const document = value as DocumentOut;
+			return !["signed", "partially signed"].includes(document.status);
 	};
 
 	return (
-		<>
-			<Menu>
-				<MenuButton
-					as={Button}
-					rightIcon={<BsThreeDotsVertical />}
-					variant="ghost"
-					isDisabled={disabled}
-				>
-					Actions
-				</MenuButton>
-				<MenuList>
-					<MenuItem icon={<FiEye />} onClick={handleViewDocument}>
-						View {type}
-					</MenuItem>
-					<MenuItem icon={<FiEdit />} onClick={editModal.onOpen}>
-						Edit {type}
-					</MenuItem>
-					<MenuItem
-						icon={<FiTrash />}
-						color="red.500"
-						onClick={deleteModal.onOpen}
-					>
-						Delete {type}
-					</MenuItem>
-				</MenuList>
-				{renderEditModal()}
-				{renderDeleteModal()}
-			</Menu>
+			<>
+					<Menu>
+							<MenuButton
+									as={Button}
+									rightIcon={<BsThreeDotsVertical />}
+									variant="ghost"
+									isDisabled={disabled}
+							>
+									Actions
+							</MenuButton>
+							<MenuList>
+									<MenuItem icon={<FiEye />} onClick={handleViewDocument}>
+											View {type}
+									</MenuItem>
+									<MenuItem icon={<FiEdit />} onClick={editModal.onOpen}>
+											Edit {type}
+									</MenuItem>
+									<MenuItem
+											icon={<FiTrash />}
+											color="red.500"
+											onClick={deleteModal.onOpen}
+											isDisabled={!isDeletableDocument()}
+									>
+											Delete {type}
+									</MenuItem>
+							</MenuList>
+							{renderEditModal()}
+							{renderDeleteModal()}
+					</Menu>
 
-			<DocumentModal
-				isOpen={viewModal.isOpen}
-				onClose={viewModal.onClose}
-				documentDetails={documentDetails}
-				fileBlob={fileBlob}
-			/>
-		</>
+					<DocumentModal
+							isOpen={viewModal.isOpen}
+							onClose={viewModal.onClose}
+							documentDetails={documentDetails}
+							fileBlob={fileBlob}
+					/>
+			</>
 	);
 };
 
