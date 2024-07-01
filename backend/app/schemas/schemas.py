@@ -108,6 +108,7 @@ class DocumentBase(BaseModel):
     file: str = Field(..., description="File path or identifier")
     file_url: str | None = Field(None, description="URL to view the document")
     status: DocumentStatus = Field(..., description="Current status of the document")
+    deleted: bool = Field(..., description="Set to 'True' when a Document is deleted")
 
     class Config:
         from_attributes = True

@@ -545,7 +545,7 @@ def all_signatories_signed(signatories):
 
 
 def finalize_document(session, signature_request, ip_address, static_files_dir):
-    signature_request.status = SignatureRequestStatus.SIGNED
+    signature_request.status = SignatureRequestStatus.COMPLETED
     logger.info(f"Finalizing document for signature request {signature_request.id}")
     for document in signature_request.documents:
         final_pdf_path = static_files_dir / "signed_documents" / f"{document.file}"

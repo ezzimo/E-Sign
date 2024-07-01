@@ -1,5 +1,6 @@
 from fastapi import HTTPException
 from sqlmodel import Session, select
+from sqlalchemy import and_
 
 from app.models.models import Document, User
 from app.schemas.schemas import DocumentCreate, DocumentUpdate
@@ -55,5 +56,10 @@ def get_documents_by_user(
 ) -> list[Document]:
     statement = select(Document).offset(skip).limit(limit)
     if not user.is_superuser:
-        statement = statement.where(Document.owner_id == user.id)
+        statement = statement.where(
+            and_(
+                Document.owner_id == user.id,
+                Document.deleted.is_(False),
+            )
+        )
     return db.exec(statement).all()

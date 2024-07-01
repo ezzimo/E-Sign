@@ -4,11 +4,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_db
 from app.crud import document_crud
-from app.models.models import DocField, Document, User
+from app.models.models import Document, User, DocumentStatus
 from app.schemas.schemas import DocumentCreate, DocumentOut, DocumentUpdate
 from app.services.file_service import save_file
 
@@ -61,7 +61,7 @@ def read_document(
         updated_at=document.updated_at,
         owner=document.owner,
     )
-    document_out.file_url = f"/api/v1/documents/{document_id}/download"
+    document_out.file_url = f"/api/v1/documents/{document_id}/file"
     return document_out
 
 
@@ -120,6 +120,7 @@ def read_documents(
             title=doc.title,
             file=doc.file,
             status=doc.status.value,
+            deleted=doc.deleted,
             created_at=doc.created_at,
             updated_at=doc.updated_at,
             owner=doc.owner,
@@ -176,17 +177,33 @@ def delete_document(
     document = db.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
     if not current_user.is_superuser and document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    # Manually delete related DocumentSignatureDetails records
-    document_fields_statement = select(DocField).filter_by(document_id=document_id)
-    document_fields = db.exec(document_fields_statement)
-    for field in document_fields:
-        db.delete(field)
+    if document.status in [
+        DocumentStatus.SENT_FOR_SIGNATURE,
+        DocumentStatus.VIEWED,
+        DocumentStatus.PARTIALLY_SIGNED,
+        DocumentStatus.SIGNED,
+    ]:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Cannot delete document with status '{document.status.value}'. "
+                "Deletion is only allowed for documents in 'draft' or 'rejected' status."
+            )
+        )
 
-    db.delete(document)
+    document.deleted = True
     db.commit()
+
+    # Log the deletion attempt
+    logger.info(
+        f"User {current_user.id} attempted to delete document {document_id}"
+        f"with status {document.status.value}"
+    )
+
     return {"message": "Document deleted successfully"}
 
 

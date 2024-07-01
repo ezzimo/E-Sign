@@ -41,9 +41,9 @@ class User(UserBase, table=True):
 # Enum definitions
 class DocumentStatus(enum.Enum):
     DRAFT = "draft"
-    SENT_FOR_SIGNATURE = "sent_for_signature"
+    SENT_FOR_SIGNATURE = "sent for signature"
     VIEWED = "viewed"
-    PARTIALLY_SIGNED = "partially_signed"
+    PARTIALLY_SIGNED = "partially signed"
     SIGNED = "signed"
     REJECTED = "rejected"
 
@@ -58,12 +58,20 @@ class FieldType(enum.Enum):
 
 
 class SignatureRequestStatus(enum.Enum):
-    DRAFT = "draft"
-    SENT = "sent"
-    PARTIALLY_SIGNED = "partially_signed"
-    COMPLETED = "completed"
-    EXPIRED = "expired"
-    CANCELED = "canceled"
+    DRAFT = "Draft"
+    SENT = "Sent"
+    PARTIALLY_SIGNED = "Partially signed"
+    COMPLETED = "Completed"
+    EXPIRED = "Expired"
+    CANCELED = "Canceled"
+
+
+class AuditLogAction(str, Enum):
+    DOCUMENT_UPLOADED = "document uploaded"
+    SIGNATURE_REQUESTED = "signature requested"
+    DOCUMENT_SIGNED = "document signed"
+    DOCUMENT_VIEWED = "document viewed"
+    SIGNATURE_REQUEST_CANCELED = "signature request canceled"
 
 
 # Base model for common attributes
@@ -97,6 +105,7 @@ class Document(BaseModel, table=True):
     file_url: str | None = None
     status: DocumentStatus = Field(sa_column=SAEnum(DocumentStatus))
     owner_id: int = Field(foreign_key="user.id")
+    deleted: bool = Field(default=False)
 
     owner: User = Relationship(back_populates="documents")
     signature_requests: list["SignatureRequest"] = Relationship(
@@ -237,14 +246,6 @@ class SignatureRequest(BaseModel, table=True):
         back_populates="request",
         sa_relationship_kwargs={"cascade": "all,delete,delete-orphan"},
     )
-
-
-class AuditLogAction(str, Enum):
-    DOCUMENT_UPLOADED = "document uploaded"
-    SIGNATURE_REQUESTED = "signature requested"
-    DOCUMENT_SIGNED = "document signed"
-    DOCUMENT_VIEWED = "document viewed"
-    SIGNATURE_REQUEST_CANCELED = "signature request canceled"
 
 
 class AuditLogBase(SQLModel):
