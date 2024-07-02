@@ -229,6 +229,7 @@ class SignatureRequest(BaseModel, table=True):
     sender_id: int = Field(foreign_key="user.id")
     require_otp: bool = Field(default=True)
     token: str | None = None
+    deleted: bool = Field(default=False)
 
     sender: User = Relationship()
     documents: list[Document] = Relationship(

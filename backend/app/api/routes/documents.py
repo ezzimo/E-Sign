@@ -57,6 +57,7 @@ def read_document(
         title=document.title,
         file=document.file,
         status=document.status.value,
+        deleted=document.deleted,
         created_at=document.created_at,
         updated_at=document.updated_at,
         owner=document.owner,
@@ -65,12 +66,12 @@ def read_document(
     return document_out
 
 
-@router.get("/{document_id}/download", response_class=FileResponse)
-def download_document(
+@router.get("/{document_id}/file", response_class=FileResponse)
+def get_document_file(
     document_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-):
+) -> FileResponse:
     """
     Download the PDF file by document ID.
     """
@@ -78,25 +79,14 @@ def download_document(
     if not current_user.is_superuser and document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    file_path = STATIC_FILES_DIR / f"{document.file}"
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(
-        path=file_path, filename=document.file, media_type="application/pdf"
-    )
+    if document.status in [
+        DocumentStatus.PARTIALLY_SIGNED,
+        DocumentStatus.SIGNED,
+    ]:
+        file_path = STATIC_FILES_DIR / "signed_documents" / f"{document.file}"
+    else:
+        file_path = STATIC_FILES_DIR / f"{document.file}"
 
-
-@router.get("/{document_id}/file", response_class=FileResponse)
-def get_document_file(
-    document_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> FileResponse:
-    document = document_crud.get_document_by_id(db, document_id)
-    if not current_user.is_superuser and document.owner_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-
-    file_path = STATIC_FILES_DIR / f"{document.file}"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -146,6 +136,19 @@ async def update_document(
     if not current_user.is_superuser and document.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
+    if document.status in [
+        DocumentStatus.VIEWED,
+        DocumentStatus.PARTIALLY_SIGNED,
+        DocumentStatus.SIGNED,
+    ]:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Cannot update document with status '{document.status.value}'. "
+                "Update is only allowed for documents in 'draft', 'rejected' or 'send' status."
+            )
+        )
+
     if new_file:
         file_location = save_file(new_file, current_user.id)
         document_in = DocumentUpdate(
@@ -174,19 +177,47 @@ def delete_document(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
+    """
+    Delete a document.
+
+    This endpoint allows the deletion of a document. Only the document owner
+    or a superuser can delete the document. Documents with certain statuses
+    cannot be deleted.
+
+    Args:
+        document_id (int): The ID of the document to be deleted.
+        db (Session): The database session dependency.
+        current_user (User): The current authenticated user.
+
+    Returns:
+        dict: A message indicating the success of the deletion.
+
+    Raises:
+        HTTPException: If the document is not found, the user lacks permissions,
+                       or the document status does not allow deletion.
+    """
+    # Fetch the document from the database
     document = db.get(Document, document_id)
     if not document:
+        logger.error(f"Document with ID {document_id} not found.")
         raise HTTPException(status_code=404, detail="Document not found")
 
+    # Check if the current user is authorized to delete the document
     if not current_user.is_superuser and document.owner_id != current_user.id:
+        logger.error(f"User {current_user.id} lacks permission to delete document {document_id}.")
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
+    # Prevent deletion of documents with specific statuses
     if document.status in [
         DocumentStatus.SENT_FOR_SIGNATURE,
         DocumentStatus.VIEWED,
         DocumentStatus.PARTIALLY_SIGNED,
         DocumentStatus.SIGNED,
     ]:
+        logger.warning(
+            f"User {current_user.id} attempted to delete document {document_id} "
+            f"with status {document.status.value}, which is not allowed."
+        )
         raise HTTPException(
             status_code=400,
             detail=(
@@ -195,29 +226,56 @@ def delete_document(
             )
         )
 
+    # Mark the document as deleted
     document.deleted = True
     db.commit()
 
-    # Log the deletion attempt
+    # Log the successful deletion
     logger.info(
-        f"User {current_user.id} attempted to delete document {document_id}"
-        f"with status {document.status.value}"
+        f"User {current_user.id} successfully marked document {document_id} as deleted."
     )
 
     return {"message": "Document deleted successfully"}
 
 
-@router.get("/{document_id}/file-url", response_model=str)
-def get_document_file_url(
+@router.get("/{document_id}/file-url-status", response_model=dict)
+def get_document_file_url_and_status(
     document_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> str:
+) -> dict:
+    """
+    Retrieve the file URL and status of a document by its ID.
+
+    Args:
+        document_id (int): The ID of the document.
+        current_user (User): The current authenticated user.
+        db (Session): The database session dependency.
+
+    Returns:
+        dict: A dictionary containing the file URL and document status.
+
+    Raises:
+        HTTPException: If the document is not found or the user is not authorized to access it.
+    """
     try:
-        file_url = document_crud.generate_document_file_url(
-            db, document_id, current_user.id
+        logger.info(
+            f"Attempting to retrieve file URL and status for document ID {document_id}"
+            f"by user ID {current_user.id}"
         )
-        return file_url
+
+        # Retrieve the document to get its status
+        document = document_crud.get_document_by_id(db, document_id)
+
+        logger.info(f"Successfully retrieved file URL and status for document ID {document_id}")
+
+        # Return the file URL and status in a dictionary
+        return {"file_url": document.file_url, "status": document.status.value}
+
     except HTTPException as exc:
-        logger.error(f"Failed to retrieve file URL: {exc.detail}")
+        logger.error(f"Failed to retrieve file URL and status: {exc.detail}")
         raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+    except Exception as exc:
+        logger.error(f"An unexpected error occurred: {exc}")
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -1,14 +1,19 @@
 import logging
+from typing import List
 
 from fastapi import HTTPException
+from sqlalchemy import and_
 from sqlmodel import Session, select
 
 from app.models.models import (
     DocField,
     Document,
+    RequestDocumentLink,
+    RequestSignatoryLink,
     ReminderSettings,
     Signatory,
     SignatureRequest,
+    SignatureRequestStatus,
     User,
 )
 from app.schemas.schemas import SignatureRequestCreate, SignatureRequestUpdate
@@ -122,9 +127,28 @@ def get_signature_request(db: Session, request_id: int) -> SignatureRequest | No
 def get_signature_requests_by_document(
     db: Session, document_id: int
 ) -> list[SignatureRequest]:
-    return db.exec(
-        select(SignatureRequest).where(SignatureRequest.document_id == document_id)
-    ).all()
+    """
+    Fetch all signature requests linked to a specific document ID.
+
+    Args:
+        db (Session): The database session dependency.
+        document_id (int): The ID of the document.
+
+    Returns:
+        list[SignatureRequest]: A list of signature requests linked to the document.
+    """
+    try:
+        # Query the signature requests associated with the document
+        statement = (
+            select(SignatureRequest)
+            .join(RequestDocumentLink)
+            .where(RequestDocumentLink.document_id == document_id)
+        )
+        signature_requests = db.exec(statement).all()
+        return signature_requests
+    except Exception as exc:
+        logger.error(f"Failed to fetch signature requests: {exc}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 def update_signature_request(
@@ -140,35 +164,88 @@ def update_signature_request(
     return db_request
 
 
-def delete_signature_request(db: Session, request_id: int):
+def delete_signature_request(db: Session, request_id: int, current_user: User):
     db_request = db.get(SignatureRequest, request_id)
     if not db_request:
         raise HTTPException(status_code=404, detail="Signature request not found")
-    db.delete(db_request)
+
+    # Ensure only owner or superuser can delete the request
+    if not current_user.is_superuser and db_request.sender_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    # Only allow deletion of certain statuses
+    if db_request.status not in [
+        SignatureRequestStatus.DRAFT,
+        SignatureRequestStatus.EXPIRED,
+        SignatureRequestStatus.CANCELED,
+    ]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete signature request with status '{db_request.status.value}'."
+        )
+
+    db_request.deleted = True
     db.commit()
+    # Log the deletion attempt
+    logger.info(f"User {current_user.id} marked signature request {request_id} as deleted.")
 
 
 def get_signatories_by_signature_request(
     db: Session, request_id: int
 ) -> list[Signatory]:
     """
-    Retrieve all signatories related to a specific signature request.
+    Retrieve all signatories related to a specific signature request ID.
+
+    Args:
+        db (Session): The database session dependency.
+        request_id (int): The ID of the Request.
+
+    Returns:
+        list[Signatory]: A list of signatory linked to the request.
     """
-    return db.exec(select(Signatory).where(Signatory.signatory_id == request_id)).all()
+    try:
+        statement = (
+            select(Signatory)
+            .join(RequestSignatoryLink)
+            .where(RequestSignatoryLink.signature_request_id == request_id)
+        )
+        signatories = db.exec(statement).all()
+        return signatories
+    except Exception as exc:
+        logger.error(f"Failed to fetch signatories: {exc}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 def get_all_signature_requests(
     db: Session, current_user: User
-) -> list[SignatureRequest]:
+) -> List[SignatureRequest]:
     """
-    Retrieve all signature requests. If the user is an admin, fetch all requests,
-    otherwise fetch only the requests created by the user.
+    Retrieve all signature requests based on user role.
+
+    - If the user is a superuser, fetch all requests.
+    - If the user is not a superuser, fetch only the requests created by the user and not marked as deleted.
+
+    Args:
+        db (Session): The database session.
+        current_user (User): The current authenticated user.
+
+    Returns:
+        List[SignatureRequest]: A list of signature requests.
     """
-    if current_user.is_superuser:
-        return db.exec(select(SignatureRequest)).all()
-    else:
-        return db.exec(
-            select(SignatureRequest).where(
-                SignatureRequest.sender_id == current_user.id
-            )
-        ).all()
+    try:
+        if current_user.is_superuser:
+            logger.info(f"Superuser {current_user.id} is fetching all signature requests.")
+            return db.exec(select(SignatureRequest)).all()
+        else:
+            logger.info(f"User {current_user.id} is fetching their non-deleted signature requests.")
+            return db.exec(
+                select(SignatureRequest).where(
+                    and_(
+                        SignatureRequest.sender_id == current_user.id,
+                        SignatureRequest.deleted.is_(False)
+                    )
+                )
+            ).all()
+    except Exception as e:
+        logger.error(f"Error fetching signature requests for user {current_user.id}: {str(e)}")
+        raise

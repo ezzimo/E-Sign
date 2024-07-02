@@ -503,13 +503,13 @@ def process_document_for_signatory(
     session, document, signatory, ip_address, static_files_dir
 ):
     logger.info(f"Processing document {document.id} for signatory {signatory.id}")
-    document.status = DocumentStatus.SIGNED
-    session.commit()
 
     final_pdf_path = static_files_dir / "signed_documents" / f"{document.file}"
     for field in signatory.fields:
         if field.document_id == document.id:
             add_fields_to_pdf(document.file, field, signatory, document.owner_id)
+    document.file_url = final_pdf_path
+    session.commit()
 
     # Convert the updated PDF to images and replace old images
     folder_name = f"{document.owner_id}_{document.title}"
