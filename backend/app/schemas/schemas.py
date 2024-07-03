@@ -301,7 +301,6 @@ class SignatureRequestBase(BaseModel):
     expiry_date: datetime | None = None
     message: str | None = None
     token: str | None = Field(None, description="Token to get the Iframe for Signature")
-    deleted: bool = Field(..., description="Set to 'True' when a Signature request is deleted")
 
     class Config:
         from_attributes = True

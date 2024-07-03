@@ -94,7 +94,9 @@ def initiate_signature_request(
         HTTPException: If no signatories are provided, or if the user is not authorized
                        to use the specified documents.
     """
-    logger.info(f"User {current_user.id} is attempting to initiate a signature request.")
+    logger.info(
+        f"User {current_user.id} is attempting to initiate a signature request."
+    )
 
     # Validate signatories
     if len(signature_request.signatories) == 0:
@@ -113,12 +115,14 @@ def initiate_signature_request(
         )
 
     # Verify document ownership
-    document_ids = [doc.id for doc in signature_request.documents]
+    document_ids = [doc for doc in signature_request.documents]
     documents = db.exec(select(Document).where(Document.id.in_(document_ids))).all()
 
     for document in documents:
         if document.owner_id != current_user.id and not current_user.is_superuser:
-            logger.error(f"User {current_user.id} is not authorized to use document {document.id}.")
+            logger.error(
+                f"User {current_user.id} is not authorized to use document {document.id}."
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"You do not have permission to use document '{document.title}' (ID: {document.id}).",
@@ -174,7 +178,9 @@ def initiate_signature_request(
         signatories=[SignatoryOut.model_validate(sig) for sig in signatories],
     )
 
-    logger.info(f"Signature request {response_data.id} initiated successfully by user {current_user.id}.")
+    logger.info(
+        f"Signature request {response_data.id} initiated successfully by user {current_user.id}."
+    )
 
     return response_data
 
@@ -278,8 +284,12 @@ def delete_sig_request(
             logger.error(f"Signature request with ID {request_id} not found.")
             raise HTTPException(status_code=404, detail="Signature request not found")
 
-        delete_signature_request(db=db, request_id=request_id, current_user=current_user)
-        logger.info(f"Signature request {request_id} deleted by user {current_user.id}.")
+        delete_signature_request(
+            db=db, request_id=request_id, current_user=current_user
+        )
+        logger.info(
+            f"Signature request {request_id} deleted by user {current_user.id}."
+        )
         return {"message": "Signature request deleted successfully"}
     except HTTPException as exc:
         logger.error(f"Failed to delete signature request: {exc.detail}")

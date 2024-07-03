@@ -8,7 +8,7 @@ from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_db
 from app.crud import document_crud
-from app.models.models import Document, User, DocumentStatus
+from app.models.models import Document, DocumentStatus, User
 from app.schemas.schemas import DocumentCreate, DocumentOut, DocumentUpdate
 from app.services.file_service import save_file
 
@@ -146,7 +146,7 @@ async def update_document(
             detail=(
                 f"Cannot update document with status '{document.status.value}'. "
                 "Update is only allowed for documents in 'draft', 'rejected' or 'send' status."
-            )
+            ),
         )
 
     if new_file:
@@ -204,7 +204,9 @@ def delete_document(
 
     # Check if the current user is authorized to delete the document
     if not current_user.is_superuser and document.owner_id != current_user.id:
-        logger.error(f"User {current_user.id} lacks permission to delete document {document_id}.")
+        logger.error(
+            f"User {current_user.id} lacks permission to delete document {document_id}."
+        )
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
     # Prevent deletion of documents with specific statuses
@@ -223,7 +225,7 @@ def delete_document(
             detail=(
                 f"Cannot delete document with status '{document.status.value}'. "
                 "Deletion is only allowed for documents in 'draft' or 'rejected' status."
-            )
+            ),
         )
 
     # Mark the document as deleted
@@ -267,7 +269,9 @@ def get_document_file_url_and_status(
         # Retrieve the document to get its status
         document = document_crud.get_document_by_id(db, document_id)
 
-        logger.info(f"Successfully retrieved file URL and status for document ID {document_id}")
+        logger.info(
+            f"Successfully retrieved file URL and status for document ID {document_id}"
+        )
 
         # Return the file URL and status in a dictionary
         return {"file_url": document.file_url, "status": document.status.value}

@@ -240,6 +240,7 @@ def add_fields_to_pdf(document_filename, field, signatory, owner_id):
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=letter)
 
+    logger.info(f"Drawing field for signatory {signatory.id} on page {field.page}")
     draw_doc_field(can, field, signatory)
     can.save()
 
@@ -494,7 +495,7 @@ def process_signatory_signature(
         document_path = process_document_for_signatory(
             session, document, signatory, ip_address, static_files_dir
         )
-        if len(signature_request.signatories) == 1:
+        if document_path and len(signature_request.signatories) == 1:
             apply_pdf_security(str(document_path))
     logger.info(f"Signature processed for signatory {signatory.id}")
 
@@ -505,37 +506,47 @@ def process_document_for_signatory(
     logger.info(f"Processing document {document.id} for signatory {signatory.id}")
 
     final_pdf_path = static_files_dir / "signed_documents" / f"{document.file}"
+
+    # Check if the signatory has fields for this document
+    has_fields = False
     for field in signatory.fields:
         if field.document_id == document.id:
+            has_fields = True
             add_fields_to_pdf(document.file, field, signatory, document.owner_id)
-    document.file_url = final_pdf_path
-    session.commit()
 
-    # Convert the updated PDF to images and replace old images
-    folder_name = f"{document.owner_id}_{document.title}"
-    image_folder = static_files_dir / folder_name
-    if image_folder.exists():
-        # Remove old images
-        for img_file in image_folder.glob("*.png"):
-            img_file.unlink()
+    if has_fields:
+        document.file_url = final_pdf_path
+        session.commit()
 
-    # Convert the updated PDF to images
-    convert_pdf_to_images(final_pdf_path, image_folder)
+        # Convert the updated PDF to images and replace old images
+        folder_name = f"{document.owner_id}_{document.title}"
+        image_folder = static_files_dir / folder_name
+        if image_folder.exists():
+            # Remove old images
+            for img_file in image_folder.glob("*.png"):
+                img_file.unlink()
 
-    pdf_hash = generate_pdf_hash(str(final_pdf_path))
-    logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
+        # Convert the updated PDF to images
+        convert_pdf_to_images(final_pdf_path, image_folder)
 
-    document_signature_details = DocumentSignatureDetailsCreate(
-        document_id=document.id,
-        signed_hash=pdf_hash,
-        timestamp=datetime.now(),
-        ip_address=ip_address,
-    )
-    signed_document_crud.create_document_signature_details(
-        session, document_signature_details
-    )
+        pdf_hash = generate_pdf_hash(str(final_pdf_path))
+        logger.info(f"Generated hash for document {document.id}: {pdf_hash}")
 
-    return final_pdf_path
+        document_signature_details = DocumentSignatureDetailsCreate(
+            document_id=document.id,
+            signed_hash=pdf_hash,
+            timestamp=datetime.now(),
+            ip_address=ip_address,
+        )
+        signed_document_crud.create_document_signature_details(
+            session, document_signature_details
+        )
+    else:
+        logger.warning(
+            f"No fields found for signatory {signatory.id} in document {document.id}"
+        )
+
+    return final_pdf_path if has_fields else None
 
 
 def all_signatories_signed(signatories):

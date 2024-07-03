@@ -8,9 +8,9 @@ from sqlmodel import Session, select
 from app.models.models import (
     DocField,
     Document,
+    ReminderSettings,
     RequestDocumentLink,
     RequestSignatoryLink,
-    ReminderSettings,
     Signatory,
     SignatureRequest,
     SignatureRequestStatus,
@@ -36,6 +36,7 @@ def create_signature_request(
         expiry_date=request_data.expiry_date,
         sender_id=sender_id,
         require_otp=request_data.require_otp,
+        deleted=False
     )
     db.add(signature_request)
     db.commit()
@@ -181,13 +182,15 @@ def delete_signature_request(db: Session, request_id: int, current_user: User):
     ]:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot delete signature request with status '{db_request.status.value}'."
+            detail=f"Cannot delete signature request with status '{db_request.status.value}'.",
         )
 
     db_request.deleted = True
     db.commit()
     # Log the deletion attempt
-    logger.info(f"User {current_user.id} marked signature request {request_id} as deleted.")
+    logger.info(
+        f"User {current_user.id} marked signature request {request_id} as deleted."
+    )
 
 
 def get_signatories_by_signature_request(
@@ -234,18 +237,24 @@ def get_all_signature_requests(
     """
     try:
         if current_user.is_superuser:
-            logger.info(f"Superuser {current_user.id} is fetching all signature requests.")
+            logger.info(
+                f"Superuser {current_user.id} is fetching all signature requests."
+            )
             return db.exec(select(SignatureRequest)).all()
         else:
-            logger.info(f"User {current_user.id} is fetching their non-deleted signature requests.")
+            logger.info(
+                f"User {current_user.id} is fetching their non-deleted signature requests."
+            )
             return db.exec(
                 select(SignatureRequest).where(
                     and_(
                         SignatureRequest.sender_id == current_user.id,
-                        SignatureRequest.deleted.is_(False)
+                        SignatureRequest.deleted.is_(False),
                     )
                 )
             ).all()
     except Exception as e:
-        logger.error(f"Error fetching signature requests for user {current_user.id}: {str(e)}")
+        logger.error(
+            f"Error fetching signature requests for user {current_user.id}: {str(e)}"
+        )
         raise
