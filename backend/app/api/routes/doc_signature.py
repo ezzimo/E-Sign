@@ -51,7 +51,10 @@ STATIC_FILES_DIR = Path("/app/static/document_files")
 
 @router.get("/sign_document", response_class=HTMLResponse)
 def access_document_with_token(
-    *, session: SessionDep, token: str = Query(...), request: Request
+    *,
+    session: SessionDep,
+    token: str = Query(...),
+    request: Request,
 ):
     """
     Access document with a secure token and render the signing page.
@@ -60,6 +63,7 @@ def access_document_with_token(
         session (Session): Database session dependency.
         token (str): Secure token for accessing the document.
         request (Request): FastAPI request object.
+        response (Response): FastAPI response object.
 
     Returns:
         HTMLResponse: Renders the signing page template.
@@ -129,31 +133,37 @@ def access_document_with_token(
         ]
         document_urls.append(image_urls)
 
-        # Update document status to VIEWED if not already
-        if document.status != DocumentStatus.VIEWED:
-            document.status = DocumentStatus.VIEWED
-            session.add(document)
-            session.commit()
-            session.refresh(document)
+        # Check if the document has been viewed in this session
+        session_key = f"document_viewed_{document.id}"
+        if session_key not in request.session:
+            # Update document status to VIEWED if not already
+            if document.status != DocumentStatus.VIEWED:
+                document.status = DocumentStatus.VIEWED
+                session.add(document)
+                session.commit()
+                session.refresh(document)
 
-        # Log the document view
-        audit_log_crud.create_audit_log(
-            session,
-            AuditLogCreate(
-                description="Document viewed",
-                ip_address=request.client.host,
-                action=AuditLogAction.DOCUMENT_VIEWED,
-                signature_request_id=signature_request_id,
-            ),
-        )
+            # Log the document view
+            audit_log_crud.create_audit_log(
+                session,
+                AuditLogCreate(
+                    description="Document viewed",
+                    ip_address=request.client.host,
+                    action=AuditLogAction.DOCUMENT_VIEWED,
+                    signature_request_id=signature_request_id,
+                ),
+            )
 
-        # Send notification email
-        send_signature_request_notification_email(
-            signature_request.sender.email,
-            signature_request.name,
-            signature_request.id,
-            signature_request.status.value,
-        )
+            # Send notification email
+            send_signature_request_notification_email(
+                signature_request.sender.email,
+                signature_request.name,
+                signature_request.id,
+                signature_request.status.value,
+            )
+
+            # Mark the document as viewed in the session
+            request.session[session_key] = True
 
     # Fetch the signatory
     signatory_statement = select(Signatory).where(Signatory.id == int(signatory_id))

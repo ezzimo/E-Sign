@@ -141,137 +141,6 @@ def apply_pdf_security(pdf_path: str):
         writer.write(f)
 
 
-def draw_signature_field(c, field, signatory):
-    logger.info(
-        f"""
-        Drawing signature field for signatory {signatory.id}:
-        {signatory.first_name} {signatory.last_name} at ({field.x}, {field.y})
-        with dimensions ({field.width}, {field.height})
-        """
-    )
-    if signatory.signature_image:
-        logger.info(f"Using signature image at {signatory.signature_image}")
-        try:
-            image = ImageReader(signatory.signature_image)
-            c.drawImage(
-                image,
-                field.x,
-                field.y,
-                width=field.width,
-                height=field.height,
-                mask="auto",
-            )
-        except Exception as e:
-            logger.error(f"Failed to draw signature image: {e}")
-            # Fallback to handwritten font if image drawing fails
-            c.setFont("Handwriting", 24)
-            c.setFillColor(black)
-            c.drawString(
-                field.x, field.y, f"{signatory.first_name} {signatory.last_name}"
-            )
-    else:
-        logger.info("Using handwritten font for signature")
-        c.setFont("Handwriting", 24)
-        c.setFillColor(black)
-        c.drawString(field.x, field.y, f"{signatory.first_name} {signatory.last_name}")
-    # c.rect(field.x, field.y - 10, field.width, field.height)
-
-
-def draw_text_field(c, field):
-    c.drawString(field.x, field.y, field.text)
-
-
-def draw_mention_field(c, field):
-    c.drawString(field.x, field.y, f"{field.mention}")
-
-
-def draw_read_only_text_field(c, field):
-    c.drawString(field.x, field.y, field.text)
-
-
-def draw_checkbox_field(c, field):
-    if field.checked:
-        # Adjusting the size for drawing the check, to fit within the expected box size
-        check_mark_size = field.size / 2
-        start_x = field.x
-        start_y = field.y
-        end_x = start_x + check_mark_size
-        end_y = start_y + check_mark_size
-
-        # Draw a simple check mark (like a tick)
-        # This draws one line from bottom left to top right
-        c.line(start_x, start_y, end_x, end_y)
-
-        # Optional: Add another line from top left to bottom right to form an 'X'
-        c.line(start_x, end_y, end_x, start_y)
-
-
-def draw_radio_group_field(c, field):
-    for radio in field.radios:
-        c.circle(radio.x, radio.y, radio.size / 2)
-        if radio.checked:
-            c.circle(radio.x, radio.y, radio.size / 4, fill=1)
-
-
-def draw_doc_field(c, field, signatory):
-    logger.info(f"Drawing field type: {field.type}")
-    if field.type == FieldType.SIGNATURE:
-        draw_signature_field(c, field, signatory)
-    elif field.type == FieldType.TEXT:
-        draw_text_field(c, field)
-    elif field.type == FieldType.MENTION:
-        draw_mention_field(c, field)
-    elif field.type == FieldType.READ_ONLY_TEXT:
-        draw_read_only_text_field(c, field)
-    elif field.type == FieldType.CHECKBOX:
-        draw_checkbox_field(c, field)
-    elif field.type == FieldType.RADIO_GROUP:
-        draw_radio_group_field(c, field)
-
-
-def add_fields_to_pdf(document_filename, field, signatory, owner_id):
-    base_path = UPLOAD_DIR / f"{document_filename}"
-    signed_path = UPLOAD_DIR / "signed_documents" / f"{document_filename}"
-
-    # Check if file exists in 'signed_documents'
-    file_path = signed_path if signed_path.exists() else base_path
-
-    logger.info(f"Adding fields to PDF: {file_path}")
-    packet = io.BytesIO()
-    can = canvas.Canvas(packet, pagesize=letter)
-
-    logger.info(f"Drawing field for signatory {signatory.id} on page {field.page}")
-    draw_doc_field(can, field, signatory)
-    can.save()
-
-    # Process the PDF modifications
-    packet.seek(0)
-    new_pdf = PyPDF2.PdfReader(packet)
-    existing_pdf = PyPDF2.PdfReader(open(file_path, "rb"))
-    output = PyPDF2.PdfWriter()
-
-    target_page_index = field.page - 1  # Assuming 'page' is 1-indexed
-    for page_number, page in enumerate(existing_pdf.pages):
-        if page_number == target_page_index:
-            if new_pdf.pages:
-                page.merge_page(new_pdf.pages[0])
-        output.add_page(page)
-
-    # Saving the modified PDF
-    if "signed_documents" not in str(file_path):
-        new_folder_path = file_path.parent / "signed_documents"
-        new_folder_path.mkdir(exist_ok=True)
-        new_file_name = file_path.name
-        new_file_path = new_folder_path / new_file_name
-    else:
-        new_file_path = file_path
-
-    with open(new_file_path, "wb") as outputStream:
-        output.write(outputStream)
-
-    logger.info(f"Written updated PDF to {new_file_path}")
-
-
 def generate_pdf_hash(file_path):
     with open(file_path, "rb") as f:
         file_content = f.read()
@@ -487,6 +356,19 @@ def log_otp_verification(session, ip_address, signature_request_id, signatory_id
 def process_signatory_signature(
     session, signatory, signature_request, ip_address, static_files_dir
 ):
+    """
+    Process the signature for a signatory, updating the document and applying security.
+
+    Args:
+        session: Database session.
+        signatory: Signatory object.
+        signature_request: SignatureRequest object.
+        ip_address: IP address of the request.
+        static_files_dir: Directory for static files.
+
+    Returns:
+        None
+    """
     logger.info(f"Processing signature for signatory {signatory.id}")
     signatory.signed_at = datetime.now()
     session.commit()
@@ -503,6 +385,19 @@ def process_signatory_signature(
 def process_document_for_signatory(
     session, document, signatory, ip_address, static_files_dir
 ):
+    """
+    Process the document for a signatory by adding the necessary fields.
+
+    Args:
+        session: Database session.
+        document: Document object.
+        signatory: Signatory object.
+        ip_address: IP address of the request.
+        static_files_dir: Directory for static files.
+
+    Returns:
+        str: Final PDF path if fields were added, else None.
+    """
     logger.info(f"Processing document {document.id} for signatory {signatory.id}")
 
     final_pdf_path = static_files_dir / "signed_documents" / f"{document.file}"
@@ -515,7 +410,7 @@ def process_document_for_signatory(
             add_fields_to_pdf(document.file, field, signatory, document.owner_id)
 
     if has_fields:
-        document.file_url = final_pdf_path
+        document.file_url = str(final_pdf_path)
         session.commit()
 
         # Convert the updated PDF to images and replace old images
@@ -547,6 +442,216 @@ def process_document_for_signatory(
         )
 
     return final_pdf_path if has_fields else None
+
+
+def add_fields_to_pdf(document_filename, field, signatory, owner_id):
+    """
+    Add fields to the PDF document.
+
+    Args:
+        document_filename (str): Filename of the document.
+        field: Field object.
+        signatory: Signatory object.
+        owner_id: Owner ID of the document.
+
+    Returns:
+        None
+    """
+    base_path = UPLOAD_DIR / f"{document_filename}"
+    signed_path = UPLOAD_DIR / "signed_documents" / f"{document_filename}"
+
+    # Check if file exists in 'signed_documents'
+    file_path = signed_path if signed_path.exists() else base_path
+
+    logger.info(f"Adding fields to PDF: {file_path}")
+    packet = io.BytesIO()
+    can = canvas.Canvas(packet, pagesize=letter)
+
+    logger.info(f"Drawing field for signatory {signatory.id} on page {field.page}")
+    draw_doc_field(can, field, signatory)
+    can.save()
+
+    # Process the PDF modifications
+    packet.seek(0)
+    new_pdf = PyPDF2.PdfReader(packet)
+    existing_pdf = PyPDF2.PdfReader(open(file_path, "rb"))
+    output = PyPDF2.PdfWriter()
+
+    target_page_index = field.page - 1  # Assuming 'page' is 1-indexed
+    for page_number, page in enumerate(existing_pdf.pages):
+        if page_number == target_page_index:
+            if new_pdf.pages:
+                page.merge_page(new_pdf.pages[0])
+        output.add_page(page)
+
+    # Saving the modified PDF
+    if "signed_documents" not in str(file_path):
+        new_folder_path = file_path.parent / "signed_documents"
+        new_folder_path.mkdir(exist_ok=True)
+        new_file_name = file_path.name
+        new_file_path = new_folder_path / new_file_name
+    else:
+        new_file_path = file_path
+
+    with open(new_file_path, "wb") as outputStream:
+        output.write(outputStream)
+
+    logger.info(f"Written updated PDF to {new_file_path}")
+
+
+def draw_doc_field(c, field, signatory):
+    """
+    Draw a document field on the PDF.
+
+    Args:
+        c (Canvas): ReportLab Canvas object.
+        field: Field object.
+        signatory: Signatory object.
+
+    Returns:
+        None
+    """
+    logger.info(f"Drawing field type: {field.type}")
+    if field.type == FieldType.SIGNATURE:
+        draw_signature_field(c, field, signatory)
+    elif field.type == FieldType.TEXT:
+        draw_text_field(c, field)
+    elif field.type == FieldType.MENTION:
+        draw_mention_field(c, field)
+    elif field.type == FieldType.READ_ONLY_TEXT:
+        draw_read_only_text_field(c, field)
+    elif field.type == FieldType.CHECKBOX:
+        draw_checkbox_field(c, field)
+    elif field.type == FieldType.RADIO_GROUP:
+        draw_radio_group_field(c, field)
+
+
+def draw_signature_field(c, field, signatory):
+    """
+    Draw a signature field on the PDF.
+
+    Args:
+        c (Canvas): ReportLab Canvas object.
+        field: Field object.
+        signatory: Signatory object.
+
+    Returns:
+        None
+    """
+    logger.info(
+        f"Drawing signature field for signatory {signatory.id}: "
+        f"{signatory.first_name} {signatory.last_name} at ({field.x}, {field.y}) "
+        f"with dimensions ({field.width}, {field.height})"
+    )
+    if signatory.signature_image:
+        logger.info(f"Using signature image at {signatory.signature_image}")
+        try:
+            image = ImageReader(signatory.signature_image)
+            c.drawImage(image, field.x, field.y, width=field.width, height=field.height, mask="auto")
+        except Exception as e:
+            logger.error(f"Failed to draw signature image: {e}")
+            # Fallback to handwritten font if image drawing fails
+            c.setFont("Handwriting", 24)
+            c.setFillColor(black)
+            c.drawString(field.x, field.y, f"{signatory.first_name} {signatory.last_name}")
+    else:
+        logger.info("Using handwritten font for signature")
+        c.setFont("Handwriting", 24)
+        c.setFillColor(black)
+        c.drawString(field.x, field.y, f"{signatory.first_name} {signatory.last_name}")
+
+
+def draw_text_field(c, field):
+    """
+    Draw a text field on the PDF.
+
+    Args:
+        c (Canvas): ReportLab Canvas object.
+        field: Field object.
+
+    Returns:
+        None
+    """
+    c.drawString(field.x, field.y, field.text)
+
+
+def draw_mention_field(c, field):
+    """
+    Draw a mention field on the PDF.
+
+    Args:
+        c (Canvas): ReportLab Canvas object.
+        field: Field object.
+
+    Returns:
+        None
+    """
+    c.drawString(field.x, field.y, field.mention)
+
+
+def draw_read_only_text_field(c, field):
+    """
+    Draw a read-only text field on the PDF.
+
+    Args:
+        c (Canvas): ReportLab Canvas object.
+        field: Field object.
+
+    Returns:
+        None
+    """
+    c.drawString(field.x, field.y, field.text)
+
+
+def draw_checkbox_field(c, field):
+    """
+    Draw a checkbox field on the PDF.
+
+    Args:
+        c (Canvas): ReportLab Canvas object.
+        field: Field object.
+
+    Returns:
+        None
+    """
+    logger.info(
+        f"Drawing checkbox field at ({field.x}, {field.y}) "
+        f"with dimensions ({field.width}, {field.height})"
+    )
+
+    # Draw the checkbox box
+    c.rect(field.x, field.y, field.width, field.height)
+
+    if field.checked:
+        # Draw a check mark
+        check_mark_size = min(field.width, field.height) / 2
+        start_x = field.x + (field.width - check_mark_size) / 2
+        start_y = field.y + (field.height - check_mark_size) / 2
+        end_x = start_x + check_mark_size
+        end_y = start_y + check_mark_size
+
+        # Draw the check mark
+        c.line(start_x, start_y, end_x, end_y)
+        c.line(start_x, end_y, end_x, start_y)
+
+
+def draw_radio_group_field(c, field):
+    """
+    Draw a radio group field on the PDF.
+
+    Args:
+        c (Canvas): ReportLab Canvas object.
+        field: Field object.
+
+    Returns:
+        None
+    """
+    logger.info(f"Drawing radio group field at ({field.x}, {field.y})")
+    for radio in field.radios:
+        c.circle(radio.x, radio.y, radio.size / 2)
+        # if radio.checked:
+        c.circle(radio.x, radio.y, radio.size / 4, fill=1)
+        c.drawString(radio.x + radio.size, radio.y, radio.name)
 
 
 def all_signatories_signed(signatories):

@@ -7,7 +7,7 @@
 {% block content %}
 <div class="container mt-5">
     <div class="row">
-        <div class="col-3">
+        <div class="col-lg-3 col-md-4 col-sm-12 mb-4">
             <div class="sidebar">
                 <h5 class="sidebar-title">Documents</h5>
                 <ul class="list-group" id="document-list">
@@ -23,14 +23,12 @@
                 <button class="btn btn-success mt-3 w-100" id="draw-signature-btn">Draw Signature</button>
             </div>
         </div>
-        <div class="col-9">
-            <div class="document-viewer">
-                <div id="pdf-container" style="height: 800px; overflow: auto;"></div>
-                <div class="document-controls text-center mt-3">
-                    <button class="btn btn-secondary" id="prev-doc" disabled>Previous</button>
-                    <button class="btn btn-secondary" id="next-doc" disabled>Next</button>
-                    <button class="btn btn-success" id="sign-btn" disabled>Sign</button>
-                </div>
+        <div class="col-lg-9 col-md-8 col-sm-12">
+            <div class="document-viewer" id="pdf-container" style="height: 800px; overflow: auto;"></div>
+            <div class="document-controls text-center mt-3">
+                <button class="btn btn-secondary mb-2" id="prev-doc" disabled>Previous</button>
+                <button class="btn btn-secondary mb-2" id="next-doc" disabled>Next</button>
+                <button class="btn btn-success mb-2" id="sign-btn" disabled>Sign</button>
             </div>
         </div>
     </div>
@@ -72,7 +70,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <canvas id="signature-canvas" style="border: 1px solid #ccc; touch-action: none; width: 50%; height: 200px;"></canvas>
+                <canvas id="signature-canvas" style="border: 1px solid #ccc; touch-action: none;"></canvas>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="clear-signature-btn">Clear</button>

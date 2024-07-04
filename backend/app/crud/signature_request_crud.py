@@ -8,6 +8,8 @@ from sqlmodel import Session, select
 from app.models.models import (
     DocField,
     Document,
+    FieldType,
+    Radio,
     ReminderSettings,
     RequestDocumentLink,
     RequestSignatoryLink,
@@ -27,6 +29,21 @@ logger = logging.getLogger(__name__)
 def create_signature_request(
     db: Session, request_data: SignatureRequestCreate, sender_id: int
 ) -> SignatureRequest:
+    """
+    Create a new signature request and associate it with documents and signatories.
+
+    Args:
+        db (Session): The database session dependency.
+        request_data (SignatureRequestCreate): The signature request data.
+        sender_id (int): The ID of the sender (current user).
+
+    Returns:
+        SignatureRequest: The created signature request.
+
+    Raises:
+        HTTPException: If a document or signatory is not found.
+    """
+    logger.info("Creating new signature request.")
     # Create the signature request
     signature_request = SignatureRequest(
         name=request_data.name,
@@ -42,16 +59,19 @@ def create_signature_request(
     db.commit()
     db.refresh(signature_request)
 
+    logger.info("Associating documents with the signature request.")
     # Associate documents with the signature request
     for document_id in request_data.documents:
         document = db.exec(select(Document).where(Document.id == document_id)).first()
 
         if document is None:
+            logger.error(f"Document with ID {document_id} not found.")
             raise HTTPException(
                 status_code=404, detail=f"Document with ID {document_id} not found"
             )
         signature_request.documents.append(document)
 
+    logger.info("Creating and associating signatories.")
     # Create and associate signatories
     for signer_data in request_data.signatories:
         signatory_info = signer_data.info
@@ -83,6 +103,7 @@ def create_signature_request(
 
         signature_request.signatories.append(new_signer)
 
+        logger.info(f"Creating fields for signatory {new_signer.id}.")
         for field_data in signer_data.fields:
             new_field = DocField(
                 type=field_data.type,
@@ -97,12 +118,31 @@ def create_signature_request(
                 y=field_data.y,
                 height=field_data.height,
                 width=field_data.width,
+                checked=field_data.checked,
+                max_length=field_data.max_length,
+                question=field_data.question,
+                instruction=field_data.instruction,
             )
-
             db.add(new_field)
             db.commit()
             db.refresh(new_field)
 
+            # Handle Radio fields
+            if new_field.type == FieldType.RADIO_GROUP and field_data.radios:
+                logger.info(f"Creating radio fields for DocField {new_field.id}.")
+                for radio_data in field_data.radios:
+                    new_radio = Radio(
+                        field_id=new_field.id,
+                        name=radio_data.name,
+                        x=radio_data.x,
+                        y=radio_data.y,
+                        size=radio_data.size,
+                    )
+                    db.add(new_radio)
+                    db.commit()
+                    db.refresh(new_radio)
+
+    logger.info("Creating reminder settings if provided.")
     # Create reminder settings if provided
     if request_data.reminder_settings:
         reminder_settings = ReminderSettings(
@@ -118,6 +158,7 @@ def create_signature_request(
 
     db.commit()
     db.refresh(signature_request)
+    logger.info(f"Signature request {signature_request.id} created successfully.")
     return signature_request
 
 
