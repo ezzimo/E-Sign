@@ -11,6 +11,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "react-query";
 
 import type { UserOut } from "../../client";
+import CreateSignatureRequestForm from "../../components/SignatureRequests/CreateSignatureRequestForm";
 import Appearance from "../../components/UserSettings/Appearance";
 import ChangePassword from "../../components/UserSettings/ChangePassword";
 import DeleteAccount from "../../components/UserSettings/DeleteAccount";
@@ -18,6 +19,7 @@ import UserInformation from "../../components/UserSettings/UserInformation";
 
 const tabsConfig = [
 	{ title: "My profile", component: UserInformation },
+	{ title: "Signature Request", component: CreateSignatureRequestForm },
 	{ title: "Password", component: ChangePassword },
 	{ title: "Appearance", component: Appearance },
 	{ title: "Danger zone", component: DeleteAccount },
